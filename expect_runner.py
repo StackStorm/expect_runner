@@ -24,7 +24,7 @@ import paramiko
 from st2common.runners import ActionRunner
 from st2common import log as logging
 from st2common.constants.action import LIVEACTION_STATUS_SUCCEEDED
-# from st2common.constants.action import LIVEACTION_STATUS_FAILED
+from st2common.constants.action import LIVEACTION_STATUS_FAILED
 # from st2common.constants.action import LIVEACTION_STATUS_TIMED_OUT
 
 LOG = logging.getLogger(__name__)
@@ -42,27 +42,43 @@ def _parse_grako(output, grammar, entry):
     return parsed_output
 
 
-def _get_ssh_output(host, username, password, commands, expect):
+def _get_shell(host, username, password):
+    LOG.debug('Entering _get_shell')
+
+    # TODO: Abstract this more. I don't want to rely directly on paramiko.
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect(host, username=username, password=password)
     shell = ssh.invoke_shell()
+
+    return shell
+
+
+def _init_shell(shell):
+    LOG.debug('Entering _init_shell')
+
     shell.send('term len 0\n')
     shell.recv(1024)
-    ret = []
-    count = 0
+
+
+def _get_ssh_output(shell, commands):
+    LOG.debug('Entering _get_ssh_output')
+
+    ret = ''
+
     for command in commands:
-        shell.send(command + "\n")
+        shell.send(command[0] + "\n")
+
         return_val = ""
-        expect_search = []
-        while len(expect_search) == 0:
+        while re.search(command[1], ret) is None:
+            # TODO: See if sleep is really needed here.
             time.sleep(1)
+            # TODO: Got to be a cleaner way to do this.
             return_val += shell.recv(1024)
-            expect_search = re.findall(expect[count], return_val)
-        count += 1
-        ret.append(return_val)
+            ret += return_val
+
     LOG.info('Output: %s', ret)
-    ret = ''.join(ret).replace('\\n', '\n').replace('\\r', '')
+    ret = ret.replace('\\n', '\n').replace('\\r', '')
 
     return ret
 
@@ -77,31 +93,22 @@ class ExpectRunner(ActionRunner):
 
         LOG.debug('Entering ExpectRunner.PRE_run() for liveaction_id="%s"',
                   self.liveaction_id)
-        self._cmd = self.runner_parameters.get('cmd', None)
-        self._expect = self.runner_parameters.get('expect', None)
-        self._entry = self.runner_parameters.get('entry', None)
-        self._grammar = self.runner_parameters.get('grammar', None)
         self._username = self.runner_parameters.get('username', None)
         self._password = self.runner_parameters.get('password', None)
         self._host = self.runner_parameters.get('host', None)
 
     def run(self, action_parameters):
-        cmd = action_parameters.get('cmd', self._cmd)
-        expect = action_parameters.get('expect', self._expect)
-        entry = action_parameters.get('entry', self._entry)
-        grammar = action_parameters.get('grammar', self._grammar)
-        username = action_parameters.get('username', self._username)
-        password = action_parameters.get('password', self._password)
-        host = action_parameters.get('host', self._host)
-        output = _get_ssh_output(
-            host,
-            username,
-            password,
-            cmd,
-            expect
-        )
+        cmd = action_parameters.get('cmd', None)
+        entry = action_parameters.get('entry', None)
+        grammar = action_parameters.get('grammar', None)
 
-        result = json.dumps(_parse_grako(output, grammar, entry))
-        status = LIVEACTION_STATUS_SUCCEEDED
+        try:
+            shell = _get_shell(self._host, self._username, self._password)
+            _init_shell(shell)
 
-        return (status, result, None)
+            output = _get_ssh_output(shell, cmd)
+            result = json.dumps(_parse_grako(output, grammar, entry))
+        except Exception, error:
+            return (LIVEACTION_STATUS_FAILED, error, None)
+
+        return (LIVEACTION_STATUS_SUCCEEDED, result, None)
