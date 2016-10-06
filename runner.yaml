@@ -1,20 +1,23 @@
 - aliases: []
-  description: A runner for launching python actions.
+  description: |
+    The expect runner is used for interaction with shell devices with no API
+    for gathering the desired data. You can specifiy a list of commands to run
+    along with their expected returns. Once the ouput has been collected you
+    can parse the return for the data you need using Grako's EBNF parser.
   enabled: true
   name: expect
   runner_module: expect_runner
   runner_parameters:
     cmd:
-      description: Array of commands to send to the device.
-      type: array
-    expect:
-      description: Array containing the expected return values.
+      description: |
+        Array of tuples arranged like ("command", "expect"). For example:
+        ('show ip route', '>')
       type: array
     entry:
       description: Grako grammer entry point.
       type: string
     grammar:
-      description: Grako EBNF grammar.
+      description: Grako EBNF grammar for pasring output.
       type: string
     host:
       description: Host to connect to.
