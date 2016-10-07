@@ -33,6 +33,19 @@ HANDLER = 'ssh'
 
 HANDLERS = {}
 
+ENTRY_TIME = time.time()
+
+TIMEOUT = 60
+
+
+def check_timer():
+    elapsed_time = time.time() - ENTRY_TIME
+
+    if elapsed_time >= TIMEOUT:
+        return True
+    else:
+        return False
+
 
 def get_runner():
     return ExpectRunner(str(uuid.uuid4()))
@@ -41,7 +54,6 @@ def get_runner():
 class ExpectRunner(ActionRunner):
     def __init__(self, runner_id):
         super(ExpectRunner, self).__init__(runner_id=runner_id)
-        self._timeout = 60
 
     def _parse_grako(self, output):
         parser = grako.genmodel("output_parser", self._grammar)
@@ -77,6 +89,10 @@ class ExpectRunner(ActionRunner):
         self._cmd = self.runner_parameters.get('cmd', None)
         self._entry = self.runner_parameters.get('entry', None)
         self._grammar = self.runner_parameters.get('grammar', None)
+        self._timeout = self.runner_parameters.get('timeout', 60)
+
+        global TIMEOUT
+        TIMEOUT = self._timeout
 
     def run(self, action_parameters):
         LOG.debug('Entering ExpectRunner.PRE_run() for liveaction_id="%s"',
@@ -118,10 +134,10 @@ class SSHHandler(ConnectionHandler):
         self._shell = self._ssh.invoke_shell()
         self._shell.settimeout(timeout)
 
-        while not self._shell.recv_ready():
+        while not self._shell.recv_ready() and check_timer():
             time.sleep(.2)
 
-        while self._shell.recv_ready():
+        while self._shell.recv_ready() and check_timer():
             LOG.debug("Captured init message: %s", self._shell.recv(1024))
 
     def send(self, command, expect):
@@ -130,7 +146,7 @@ class SSHHandler(ConnectionHandler):
         self._shell.send(command + "\n")
 
         return_val = ""
-        while re.search(expect, return_val) is None:
+        while re.search(expect, return_val) is None and check_timer():
             if not self._shell.recv_ready():
                 time.sleep(.2)
                 continue
