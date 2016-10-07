@@ -65,7 +65,7 @@ class ExpectRunner(ActionRunner):
     def _init_shell(self):
         LOG.debug('Entering _init_shell')
 
-        self._shell.send('term len 0\n', r'.*')
+        self._shell.send('term len 0\n', r'>')
 
     def pre_run(self):
         super(ExpectRunner, self).pre_run()
@@ -86,7 +86,11 @@ class ExpectRunner(ActionRunner):
         try:
             handler = HANDLERS[HANDLER]
 
-            self._shell = handler(self._host, self._username, self._password)
+            self._shell = handler(
+                self._host,
+                self._username,
+                self._password,
+                self._timeout)
             self._init_shell()
 
             output = self._get_shell_output()
@@ -108,11 +112,18 @@ class ConnectionHandler(object):
 
 
 class SSHHandler(ConnectionHandler):
-    def __init__(self, host, username, password):
+    def __init__(self, host, username, password, timeout):
         self._ssh = paramiko.SSHClient()
         self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self._ssh.connect(host, username=username, password=password)
         self._shell = self._ssh.invoke_shell()
+        self._shell.settimeout(timeout)
+
+        while not self._shell.recv_ready():
+            time.sleep(.2)
+
+        while self._shell.recv_ready():
+            LOG.debug("Captured init message: %s", self._shell.recv(1024))
 
     def send(self, command, expect):
         LOG.debug('Entering _get_ssh_output')
@@ -121,9 +132,10 @@ class SSHHandler(ConnectionHandler):
 
         return_val = ""
         while re.search(expect, return_val) is None:
-            # TODO: See if sleep is really needed here.
-            time.sleep(1)
-            # TODO: Got to be a cleaner way to do this.
+            if not self._shell.recv_ready():
+                time.sleep(.2)
+                continue
+
             return_val += self._shell.recv(1024)
 
         LOG.debug('Output: %s', return_val)
