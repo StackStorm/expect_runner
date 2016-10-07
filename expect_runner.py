@@ -29,6 +29,10 @@ from st2common.constants.action import LIVEACTION_STATUS_FAILED
 
 LOG = logging.getLogger(__name__)
 
+HANDLER = 'ssh'
+
+HANDLERS = {}
+
 
 def get_runner():
     return ExpectRunner(str(uuid.uuid4()))
@@ -42,51 +46,26 @@ def _parse_grako(output, grammar, entry):
     return parsed_output
 
 
-def _get_shell(host, username, password):
-    LOG.debug('Entering _get_shell')
-
-    # TODO: Abstract this more. I don't want to rely directly on paramiko.
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(host, username=username, password=password)
-    shell = ssh.invoke_shell()
-
-    return shell
-
-
-def _init_shell(shell):
-    LOG.debug('Entering _init_shell')
-
-    shell.send('term len 0\n')
-    shell.recv(1024)
-
-
-def _get_ssh_output(shell, commands):
-    LOG.debug('Entering _get_ssh_output')
-
-    ret = ''
-
-    for command in commands:
-        shell.send(command[0] + "\n")
-
-        return_val = ""
-        while re.search(command[1], ret) is None:
-            # TODO: See if sleep is really needed here.
-            time.sleep(1)
-            # TODO: Got to be a cleaner way to do this.
-            return_val += shell.recv(1024)
-            ret += return_val
-
-    LOG.info('Output: %s', ret)
-    ret = ret.replace('\\n', '\n').replace('\\r', '')
-
-    return ret
-
-
 class ExpectRunner(ActionRunner):
     def __init__(self, runner_id):
         super(ExpectRunner, self).__init__(runner_id=runner_id)
         self._timeout = 60
+
+    def _get_shell_output(self):
+        output = ''
+        for command in self._cmd:
+            cmd = command[0]
+            expect = command[1]
+            LOG.debug("Dispatching command: %s, %s", cmd, expect)
+
+            output += self._shell.send(cmd, expect)
+
+        return output
+
+    def _init_shell(self):
+        LOG.debug('Entering _init_shell')
+
+        self._shell.send('term len 0\n', r'.*')
 
     def pre_run(self):
         super(ExpectRunner, self).pre_run()
@@ -96,19 +75,60 @@ class ExpectRunner(ActionRunner):
         self._username = self.runner_parameters.get('username', None)
         self._password = self.runner_parameters.get('password', None)
         self._host = self.runner_parameters.get('host', None)
+        self._cmd = self.runner_parameters.get('cmd', None)
+        self._entry = self.runner_parameters.get('entry', None)
+        self._grammar = self.runner_parameters.get('grammar', None)
 
     def run(self, action_parameters):
-        cmd = action_parameters.get('cmd', None)
-        entry = action_parameters.get('entry', None)
-        grammar = action_parameters.get('grammar', None)
+        LOG.debug('Entering ExpectRunner.PRE_run() for liveaction_id="%s"',
+                  self.liveaction_id)
 
         try:
-            shell = _get_shell(self._host, self._username, self._password)
-            _init_shell(shell)
+            handler = HANDLERS[HANDLER]
 
-            output = _get_ssh_output(shell, cmd)
-            result = json.dumps(_parse_grako(output, grammar, entry))
+            self._shell = handler(self._host, self._username, self._password)
+            self._init_shell()
+
+            output = self._get_shell_output()
+            parsed_output = _parse_grako(output, self._grammar, self._entry)
+            result = json.dumps(parsed_output)
+
         except Exception, error:
-            return (LIVEACTION_STATUS_FAILED, error, None)
+            error_message = dict(error=error)
+            err = json.dumps(error_message)
+
+            return (LIVEACTION_STATUS_FAILED, err, None)
 
         return (LIVEACTION_STATUS_SUCCEEDED, result, None)
+
+
+class ConnectionHandler(object):
+    def send(self, command, expect):
+        pass
+
+
+class SSHHandler(ConnectionHandler):
+    def __init__(self, host, username, password):
+        self._ssh = paramiko.SSHClient()
+        self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self._ssh.connect(host, username=username, password=password)
+        self._shell = self._ssh.invoke_shell()
+
+    def send(self, command, expect):
+        LOG.debug('Entering _get_ssh_output')
+
+        self._shell.send(command + "\n")
+
+        return_val = ""
+        while re.search(expect, return_val) is None:
+            # TODO: See if sleep is really needed here.
+            time.sleep(1)
+            # TODO: Got to be a cleaner way to do this.
+            return_val += self._shell.recv(1024)
+
+        LOG.debug('Output: %s', return_val)
+        return_val = return_val.replace('\\n', '\n').replace('\\r', '')
+
+        return return_val
+
+HANDLERS['ssh'] = SSHHandler
