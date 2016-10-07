@@ -38,18 +38,17 @@ def get_runner():
     return ExpectRunner(str(uuid.uuid4()))
 
 
-def _parse_grako(output, grammar, entry):
-    parser = grako.genmodel("output_parser", grammar)
-    parsed_output = parser.parse(output, entry)
-    LOG.info('Parsed output: %s', parsed_output)
-
-    return parsed_output
-
-
 class ExpectRunner(ActionRunner):
     def __init__(self, runner_id):
         super(ExpectRunner, self).__init__(runner_id=runner_id)
         self._timeout = 60
+
+    def _parse_grako(self, output):
+        parser = grako.genmodel("output_parser", self._grammar)
+        parsed_output = parser.parse(output, self._entry)
+        LOG.info('Parsed output: %s', parsed_output)
+
+        return parsed_output
 
     def _get_shell_output(self):
         output = ''
@@ -94,7 +93,7 @@ class ExpectRunner(ActionRunner):
             self._init_shell()
 
             output = self._get_shell_output()
-            parsed_output = _parse_grako(output, self._grammar, self._entry)
+            parsed_output = self._parse_grako(output)
             result = json.dumps(parsed_output)
 
         except Exception, error:
