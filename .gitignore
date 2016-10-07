@@ -3,7 +3,6 @@
 *.swp
 *.log
 */requirements.txt
-!st2client/requirements.txt
 .stamp*
 
 # C extensions
