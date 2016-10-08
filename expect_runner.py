@@ -37,8 +37,10 @@ ENTRY_TIME = time.time()
 
 TIMEOUT = 60
 
+SLEEP_TIMER = 0.2
 
-def check_timer():
+
+def _check_timer():
     elapsed_time = time.time() - ENTRY_TIME
 
     if elapsed_time >= TIMEOUT:
@@ -134,10 +136,10 @@ class SSHHandler(ConnectionHandler):
         self._shell = self._ssh.invoke_shell()
         self._shell.settimeout(timeout)
 
-        while not self._shell.recv_ready() and check_timer():
-            time.sleep(.2)
+        while not self._shell.recv_ready() and _check_timer():
+            time.sleep(SLEEP_TIMER)
 
-        while self._shell.recv_ready() and check_timer():
+        while self._shell.recv_ready() and _check_timer():
             LOG.debug("Captured init message: %s", self._shell.recv(1024))
 
     def send(self, command, expect):
@@ -146,9 +148,9 @@ class SSHHandler(ConnectionHandler):
         self._shell.send(command + "\n")
 
         return_val = ""
-        while re.search(expect, return_val) is None and check_timer():
+        while re.search(expect, return_val) is None and _check_timer():
             if not self._shell.recv_ready():
-                time.sleep(.2)
+                time.sleep(SLEEP_TIMER)
                 continue
 
             return_val += self._shell.recv(1024)
