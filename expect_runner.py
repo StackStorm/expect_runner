@@ -76,9 +76,6 @@ def get_runner():
 
 
 class ExpectRunner(ActionRunner):
-    def __init__(self, runner_id):
-        super(ExpectRunner, self).__init__(runner_id=runner_id)
-
     def _parse_grako(self, output):
         parser = grako.genmodel("output_parser", self._grammar)
         parsed_output = parser.parse(output, self._entry)
