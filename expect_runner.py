@@ -15,6 +15,7 @@
 
 import uuid
 import time
+import socket
 import re
 import json
 import grako
@@ -25,7 +26,7 @@ from st2common.runners import ActionRunner
 from st2common import log as logging
 from st2common.constants.action import LIVEACTION_STATUS_SUCCEEDED
 from st2common.constants.action import LIVEACTION_STATUS_FAILED
-# from st2common.constants.action import LIVEACTION_STATUS_TIMED_OUT
+from st2common.constants.action import LIVEACTION_STATUS_TIMED_OUT
 
 LOG = logging.getLogger(__name__)
 
@@ -33,20 +34,41 @@ HANDLER = 'ssh'
 
 HANDLERS = {}
 
-ENTRY_TIME = time.time()
+ENTRY_TIME = None
 
 TIMEOUT = 60
 
 SLEEP_TIMER = 0.2
 
 
+# TODO: Consider moving to st2common.
+class TimeoutError(Exception):
+    pass
+
+
 def _check_timer():
+    elapsed_time = _elapsed_time()
+
+    return bool(elapsed_time <= TIMEOUT)
+
+
+def _elapsed_time():
     elapsed_time = time.time() - ENTRY_TIME
 
-    if elapsed_time >= TIMEOUT:
-        return True
-    else:
-        return False
+    return elapsed_time
+
+
+def _remaining_time():
+    elapsed_time = _elapsed_time()
+    remaining_time = TIMEOUT - elapsed_time
+
+    return remaining_time
+
+
+def _expect_return(expect, output):
+    search_result = bool(re.search(expect, output))
+
+    return search_result
 
 
 def get_runner():
@@ -100,6 +122,9 @@ class ExpectRunner(ActionRunner):
         LOG.debug('Entering ExpectRunner.PRE_run() for liveaction_id="%s"',
                   self.liveaction_id)
 
+        global ENTRY_TIME
+        ENTRY_TIME = time.time()
+
         try:
             handler = HANDLERS[HANDLER]
 
@@ -112,15 +137,24 @@ class ExpectRunner(ActionRunner):
 
             output = self._get_shell_output()
             parsed_output = self._parse_grako(output)
+
             result = json.dumps(parsed_output)
+            result_status = LIVEACTION_STATUS_SUCCEEDED
 
-        except Exception, error:
-            error_message = dict(error=error)
-            err = json.dumps(error_message)
+        except Exception as error:
+            LOG.debug("Hit exception running action: %s", error)
+            result_status = LIVEACTION_STATUS_FAILED
 
-            return (LIVEACTION_STATUS_FAILED, err, None)
+            if error is TimeoutError or error is socket.timeout:
+                LOG.debug("Exeption was timeout.")
+                error_message = dict(error="%s" % error)
+                result_status = LIVEACTION_STATUS_TIMED_OUT
 
-        return (LIVEACTION_STATUS_SUCCEEDED, result, None)
+            error_message = dict(error="%s" % error)
+
+            result = json.dumps(error_message)
+
+        return (result_status, result, None)
 
 
 class ConnectionHandler(object):
@@ -132,31 +166,55 @@ class SSHHandler(ConnectionHandler):
     def __init__(self, host, username, password, timeout):
         self._ssh = paramiko.SSHClient()
         self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self._ssh.connect(host, username=username, password=password)
+        self._ssh.connect(
+            host, username=username,
+            password=password,
+            timeout=timeout
+        )
         self._shell = self._ssh.invoke_shell()
-        self._shell.settimeout(timeout)
+        self._shell.settimeout(_remaining_time())
 
         while not self._shell.recv_ready() and _check_timer():
             time.sleep(SLEEP_TIMER)
 
-        while self._shell.recv_ready() and _check_timer():
-            LOG.debug("Captured init message: %s", self._shell.recv(1024))
+        self._recv()
+
+        if not _check_timer():
+            raise TimeoutError
+
+        LOG.debug("Captured init message: %s", self._recv())
+
+        if not _check_timer():
+            raise TimeoutError
 
     def send(self, command, expect):
+        self._shell.settimeout(_remaining_time())
         LOG.debug('Entering _get_ssh_output')
 
         self._shell.send(command + "\n")
 
-        return_val = ""
-        while re.search(expect, return_val) is None and _check_timer():
+        output = self._recv(expect)
+
+        LOG.debug('Output: %s', output)
+        output = output.replace('\\n', '\n').replace('\\r', '')
+
+        return output
+
+    def _recv(self, expect=None):
+        return_val = ''
+
+        while self._shell.recv_ready() and _check_timer():
             if not self._shell.recv_ready():
                 time.sleep(SLEEP_TIMER)
                 continue
 
             return_val += self._shell.recv(1024)
 
-        LOG.debug('Output: %s', return_val)
-        return_val = return_val.replace('\\n', '\n').replace('\\r', '')
+            if expect is not None and _expect_return(expect, return_val):
+                break
+
+        if not _check_timer():
+            raise TimeoutError
 
         return return_val
 
