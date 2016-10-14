@@ -46,29 +46,20 @@ class TimeoutError(Exception):
     pass
 
 
-def _check_timer():
-    elapsed_time = _elapsed_time()
-
-    return bool(elapsed_time <= TIMEOUT)
-
-
 def _elapsed_time():
-    elapsed_time = time.time() - ENTRY_TIME
+    return time.time() - ENTRY_TIME
 
-    return elapsed_time
+
+def _check_timer():
+    return _elapsed_time() <= TIMEOUT
 
 
 def _remaining_time():
-    elapsed_time = _elapsed_time()
-    remaining_time = TIMEOUT - elapsed_time
-
-    return remaining_time
+    return TIMEOUT - _elapsed_time()
 
 
 def _expect_return(expect, output):
-    search_result = bool(re.search(expect, output))
-
-    return search_result
+    return re.search(expect, output) is not None
 
 
 def get_runner():
