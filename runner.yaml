@@ -8,10 +8,10 @@
   name: expect
   runner_module: expect_runner
   runner_parameters:
-    cmd:
+    cmds:
       description: |
-        Array of tuples arranged like ["command", "expect"]. For example:
-        ['show ip route', '>']
+        Array of tuples arranged like ["command", "expect"]. A default expect statement
+        will be provided if not given. For example: ['show ip route', '>']
       type: array
     entry:
       description: Grako grammer entry point.

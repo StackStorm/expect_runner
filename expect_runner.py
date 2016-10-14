@@ -40,6 +40,8 @@ TIMEOUT = 60
 
 SLEEP_TIMER = 0.2
 
+DEFAULT_EXPECT = '((.|\n)*)(SSH|ssh)@(.*)[#>]'
+
 
 # TODO: Consider moving to st2common.
 class TimeoutError(Exception):
@@ -76,9 +78,10 @@ class ExpectRunner(ActionRunner):
 
     def _get_shell_output(self):
         output = ''
-        for command in self._cmd:
-            cmd = command[0]
-            expect = command[1]
+
+        for entry in self._cmds:
+            cmd = entry[0]
+            expect = entry[1] if len(entry) > 1 else DEFAULT_EXPECT
             LOG.debug("Dispatching command: %s, %s", cmd, expect)
 
             output += self._shell.send(cmd, expect)
@@ -101,7 +104,7 @@ class ExpectRunner(ActionRunner):
         self._username = self.runner_parameters.get('username', None)
         self._password = self.runner_parameters.get('password', None)
         self._host = self.runner_parameters.get('host', None)
-        self._cmd = self.runner_parameters.get('cmd', None)
+        self._cmds = self.runner_parameters.get('cmds', None)
         self._entry = self.runner_parameters.get('entry', None)
         self._grammar = self.runner_parameters.get('grammar', None)
         self._timeout = self.runner_parameters.get('timeout', 60)
