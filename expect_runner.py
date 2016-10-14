@@ -93,8 +93,11 @@ class ExpectRunner(ActionRunner):
     def pre_run(self):
         super(ExpectRunner, self).pre_run()
 
-        LOG.debug('Entering ExpectRunner.PRE_run() for liveaction_id="%s"',
-                  self.liveaction_id)
+        LOG.debug(
+            'Entering ExpectRunner.PRE_run() for liveaction_id="%s"',
+            self.liveaction_id
+        )
+
         self._username = self.runner_parameters.get('username', None)
         self._password = self.runner_parameters.get('password', None)
         self._host = self.runner_parameters.get('host', None)
@@ -107,8 +110,10 @@ class ExpectRunner(ActionRunner):
         TIMEOUT = self._timeout
 
     def run(self, action_parameters):
-        LOG.debug('Entering ExpectRunner.PRE_run() for liveaction_id="%s"',
-                  self.liveaction_id)
+        LOG.debug(
+            'Entering ExpectRunner.PRE_run() for liveaction_id="%s"',
+            self.liveaction_id
+        )
 
         global ENTRY_TIME
         ENTRY_TIME = time.time()
@@ -120,12 +125,12 @@ class ExpectRunner(ActionRunner):
                 self._host,
                 self._username,
                 self._password,
-                self._timeout)
-            self._init_shell()
+                self._timeout
+            )
 
+            self._init_shell()
             output = self._get_shell_output()
             parsed_output = self._parse_grako(output)
-
             result = json.dumps(parsed_output)
             result_status = LIVEACTION_STATUS_SUCCEEDED
 
