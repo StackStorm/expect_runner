@@ -141,17 +141,16 @@ class ExpectRunner(ActionRunner):
             result = json.dumps(parsed_output)
             result_status = LIVEACTION_STATUS_SUCCEEDED
 
-        except Exception as error:
-            LOG.debug("Hit exception running action: %s", error)
+        except (TimeoutError, socket.timeout) as e:
+            LOG.debug("Timed out running action.")
+            result_status = LIVEACTION_STATUS_TIMED_OUT
+            error_message = dict(error="%s" % e)
+            result = json.dumps(error_message)
+
+        except Exception as e:
+            LOG.debug("Hit exception running action: %s", e)
             result_status = LIVEACTION_STATUS_FAILED
-
-            if error is TimeoutError or error is socket.timeout:
-                LOG.debug("Exeption was timeout.")
-                error_message = dict(error="%s" % error)
-                result_status = LIVEACTION_STATUS_TIMED_OUT
-
-            error_message = dict(error="%s" % error)
-
+            error_message = dict(error="%s" % e)
             result = json.dumps(error_message)
 
         return (result_status, result, None)
