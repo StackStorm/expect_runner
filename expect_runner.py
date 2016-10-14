@@ -173,19 +173,7 @@ class SSHHandler(ConnectionHandler):
         )
         self._shell = self._ssh.invoke_shell()
         self._shell.settimeout(_remaining_time())
-
-        while not self._shell.recv_ready() and _check_timer():
-            time.sleep(SLEEP_TIMER)
-
         self._recv()
-
-        if not _check_timer():
-            raise TimeoutError
-
-        LOG.debug("Captured init message: %s", self._recv())
-
-        if not _check_timer():
-            raise TimeoutError
 
     def send(self, command, expect):
         self._shell.settimeout(_remaining_time())
@@ -203,18 +191,21 @@ class SSHHandler(ConnectionHandler):
     def _recv(self, expect=None):
         return_val = ''
 
+        while not self._shell.recv_ready() and _check_timer():
+            time.sleep(SLEEP_TIMER)
+
         while self._shell.recv_ready() and _check_timer():
+            return_val += self._shell.recv(1024)
+
+            if expect and _expect_return(expect, return_val):
+                break
+
             if not self._shell.recv_ready():
                 time.sleep(SLEEP_TIMER)
                 continue
 
-            return_val += self._shell.recv(1024)
-
-            if expect is not None and _expect_return(expect, return_val):
-                break
-
-        if not _check_timer():
-            raise TimeoutError
+        if not return_val and not _check_timer():
+            raise TimeoutError()
 
         return return_val
 
