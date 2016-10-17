@@ -9,9 +9,7 @@
   runner_module: expect_runner
   runner_parameters:
     cmds:
-      description: |
-        Array of tuples arranged like ["command", "expect"]. A default expect statement
-        will be provided if not given. For example: ['show ip route', '>']
+      description: List of commands to execute.
       type: array
     entry:
       description: Grako grammer entry point.
@@ -27,6 +25,12 @@
       type: string
     password:
       description: Password to use to log in to device.
+      secret: true
+      type: string
+    privilege_password:
+      description: |
+        If provided, set device to privilege mode with this password prior to running commands.
+        This is typically different than the login user password.
       secret: true
       type: string
     timeout:

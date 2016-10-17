@@ -80,11 +80,13 @@ class ExpectRunner(ActionRunner):
         output = ''
 
         for entry in self._cmds:
-            cmd = entry[0]
-            expect = entry[1] if len(entry) > 1 else DEFAULT_EXPECT
-            LOG.debug("Dispatching command: %s, %s", cmd, expect)
+            #cmd = entry[0]
+            #expect = entry[1] if len(entry) > 1 else DEFAULT_EXPECT
+            #LOG.debug("Dispatching command: %s, %s", cmd, expect)
+            #output += self._shell.send(cmd, expect)
 
-            output += self._shell.send(cmd, expect)
+            # TO DO: fix jinja rendering of complex nesting of types in st2
+            output += self._shell.send(entry, DEFAULT_EXPECT)
 
         return output
 
@@ -92,6 +94,13 @@ class ExpectRunner(ActionRunner):
         LOG.debug('Entering _init_shell')
 
         self._shell.send('term len 0\n', r'>')
+
+        if self._privilege_password:
+            self._shell.send('enable %s\n' % self._privilege_password, DEFAULT_EXPECT)
+
+    def _close_shell(self):
+        LOG.debug('Terminating shell session')
+        self._shell.terminate()
 
     def pre_run(self):
         super(ExpectRunner, self).pre_run()
@@ -103,6 +112,7 @@ class ExpectRunner(ActionRunner):
 
         self._username = self.runner_parameters.get('username', None)
         self._password = self.runner_parameters.get('password', None)
+        self._privilege_password = self.runner_parameters.get('privilege_password', None)
         self._host = self.runner_parameters.get('host', None)
         self._cmds = self.runner_parameters.get('cmds', None)
         self._entry = self.runner_parameters.get('entry', None)
@@ -133,8 +143,14 @@ class ExpectRunner(ActionRunner):
 
             self._init_shell()
             output = self._get_shell_output()
-            parsed_output = self._parse_grako(output)
-            result = json.dumps(parsed_output)
+            self._close_shell()
+
+            if self._grammar:
+                parsed_output = self._parse_grako(output)
+                result = json.dumps(parsed_output)
+            else:
+                result = output
+
             result_status = LIVEACTION_STATUS_SUCCEEDED
 
         except (TimeoutError, socket.timeout) as e:
@@ -169,6 +185,9 @@ class SSHHandler(ConnectionHandler):
         self._shell = self._ssh.invoke_shell()
         self._shell.settimeout(_remaining_time())
         self._recv()
+
+    def terminate(self):
+        self._shell.close()
 
     def send(self, command, expect):
         self._shell.settimeout(_remaining_time())
