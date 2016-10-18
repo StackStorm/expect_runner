@@ -40,6 +40,8 @@ TIMEOUT = 60
 
 SLEEP_TIMER = 0.2
 
+# TODO: This can't make it into initial push for runner since it's specific to
+# MLXe. Needs to be replaced by device definition.
 DEFAULT_EXPECT = '((.|\n)*)(SSH|ssh)@(.*)[#>]'
 
 
@@ -156,14 +158,18 @@ class ExpectRunner(ActionRunner):
         except (TimeoutError, socket.timeout) as e:
             LOG.debug("Timed out running action.")
             result_status = LIVEACTION_STATUS_TIMED_OUT
-            error_message = dict(error="%s" % e)
-            result = json.dumps(error_message)
+            error_message = dict(
+                result=None,
+                error='Action failed to complete in %s seconds' % TIMEOUT,
+                exit_code=-9
+            )
+            result = error_message
 
         except Exception as e:
             LOG.debug("Hit exception running action: %s", e)
             result_status = LIVEACTION_STATUS_FAILED
-            error_message = dict(error="%s" % e)
-            result = json.dumps(error_message)
+            error_message = dict(error="%s" % e, result=None)
+            result = error_message
 
         return (result_status, result, None)
 
@@ -178,7 +184,8 @@ class SSHHandler(ConnectionHandler):
         self._ssh = paramiko.SSHClient()
         self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self._ssh.connect(
-            host, username=username,
+            host,
+            username=username,
             password=password,
             timeout=timeout
         )
@@ -211,7 +218,7 @@ class SSHHandler(ConnectionHandler):
         while self._shell.recv_ready() and _check_timer():
             return_val += self._shell.recv(1024)
 
-            if expect and _expect_return(expect, return_val):
+            if (expect and _expect_return(expect, return_val)) or not expect:
                 break
 
             if not self._shell.recv_ready():
