@@ -151,7 +151,7 @@ class ExpectRunner(ActionRunner):
                 parsed_output = self._parse_grako(output)
                 result = json.dumps(parsed_output)
             else:
-                result = output
+                result = json.dumps({'stdout': output})
 
             result_status = LIVEACTION_STATUS_SUCCEEDED
 
