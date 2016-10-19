@@ -1,0 +1,40 @@
+- aliases: []
+  description: |
+    The expect runner is used for interaction with shell devices with no API
+    for gathering the desired data. You can specifiy a list of commands to run
+    along with their expected returns. Once the output has been collected you
+    can parse the return for the data you need using Grako's EBNF parser.
+  enabled: true
+  name: expect
+  runner_module: expect_runner
+  runner_parameters:
+    cmds:
+      description: List of commands to execute.
+      type: array
+    entry:
+      description: Grako grammer entry point.
+      type: string
+    grammar:
+      description: Grako EBNF grammar for pasring output.
+      type: string
+    host:
+      description: Host to connect to.
+      type: string
+    username:
+      description: Username to use to log in to device.
+      type: string
+    password:
+      description: Password to use to log in to device.
+      secret: true
+      type: string
+    privilege_password:
+      description: |
+        If provided, set device to privilege mode with this password prior to running commands.
+        This is typically different than the login user password.
+      secret: true
+      type: string
+    timeout:
+      default: 60
+      description: Action timeout in seconds. Action will get killed if it doesn't
+        finish in timeout seconds.
+      type: integer
