@@ -25,7 +25,7 @@ from st2tests.base import CleanDbTestCase
 
 RUNNER_PARAMETERS = dict(
     cmds=[
-        'one happy command'
+        ['one happy command']
     ],
     grammar="""@@whitespace :: /[\t ]+/
     entry = /(?:.|\n)+/;
@@ -38,8 +38,8 @@ RUNNER_PARAMETERS = dict(
 )
 
 MULTIPLE_COMMANDS = [
-    'one happy command',
-    'two happy commands'
+    ['one happy command'],
+    ['two happy commands', '#']
 ]
 
 MOCK_COMPLEX_GRAMMAR = """@@whitespace :: /[\t ]+/
@@ -78,6 +78,17 @@ MockParimiko = mock.MagicMock()
 MockParimiko.SSHClient().invoke_shell().recv_ready.return_value = True
 MockParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_OUTPUT
 
+
+MOCK_CONFIG = {
+    'init_cmds': ['enable'],
+    'default_expect': '#'
+}
+
+MockContentPackConfigLoader = mock.MagicMock()
+MockContentPackConfigLoader().get_config().return_value = MOCK_CONFIG
+
+
+@mock.patch('expect_runner.ContentPackConfigLoader', MockContentPackConfigLoader)
 @mock.patch('expect_runner.paramiko', MockParimiko)
 class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
     register_packs = True

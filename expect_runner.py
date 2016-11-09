@@ -24,6 +24,7 @@ import paramiko
 
 from st2common.runners import ActionRunner
 from st2common import log as logging
+from st2common.util.config_loader import ContentPackConfigLoader
 from st2common.constants.action import LIVEACTION_STATUS_SUCCEEDED
 from st2common.constants.action import LIVEACTION_STATUS_FAILED
 from st2common.constants.action import LIVEACTION_STATUS_TIMED_OUT
@@ -40,12 +41,7 @@ TIMEOUT = 60
 
 SLEEP_TIMER = 0.2
 
-# TODO: This can't make it into initial push for runner since it's specific to
-# MLXe. Needs to be replaced by device definition.
-DEFAULT_EXPECT = '((.|\n)*)(SSH|ssh)@(.*)[#>]'
 
-
-# TODO: Consider moving to st2common.
 class TimeoutError(Exception):
     pass
 
@@ -78,27 +74,20 @@ class ExpectRunner(ActionRunner):
 
         return parsed_output
 
-    def _get_shell_output(self):
+    def _get_shell_output(self, cmds):
         output = ''
 
-        for entry in self._cmds:
-            #cmd = entry[0]
-            #expect = entry[1] if len(entry) > 1 else DEFAULT_EXPECT
-            #LOG.debug("Dispatching command: %s, %s", cmd, expect)
-            #output += self._shell.send(cmd, expect)
+        if not hasattr(cmds, '__iter__'):
+            return None
 
-            # TO DO: fix jinja rendering of complex nesting of types in st2
-            output += self._shell.send(entry, DEFAULT_EXPECT)
+        for entry in cmds:
+            # TODO: fix jinja rendering of complex nesting of types in st2
+            cmd = entry[0]
+            expect = entry[1] if len(entry) > 1 else self._device_profile['default_expect']
+            LOG.debug("Dispatching command: %s, %s", cmd, expect)
+            output += self._shell.send(cmd, expect)
 
         return output
-
-    def _init_shell(self):
-        LOG.debug('Entering _init_shell')
-
-        self._shell.send('term len 0\n', r'>')
-
-        if self._privilege_password:
-            self._shell.send('enable %s\n' % self._privilege_password, DEFAULT_EXPECT)
 
     def _close_shell(self):
         LOG.debug('Terminating shell session')
@@ -112,9 +101,21 @@ class ExpectRunner(ActionRunner):
             self.liveaction_id
         )
 
+        self._device_profile = {
+            'init_cmds': None,
+            'default_expect': None
+        }
+
+        pack = self.get_pack_name()
+        user = self.get_user()
+
+        LOG.debug("Parsing config: %s, %s", pack, user)
+        config_loader = ContentPackConfigLoader(pack_name=pack, user=user)
+        self._device_profile.update(config_loader.get_config())
+        LOG.debug("Config: %s", self._device_profile)
+
         self._username = self.runner_parameters.get('username', None)
         self._password = self.runner_parameters.get('password', None)
-        self._privilege_password = self.runner_parameters.get('privilege_password', None)
         self._host = self.runner_parameters.get('host', None)
         self._cmds = self.runner_parameters.get('cmds', None)
         self._entry = self.runner_parameters.get('entry', None)
@@ -126,7 +127,7 @@ class ExpectRunner(ActionRunner):
 
     def run(self, action_parameters):
         LOG.debug(
-            'Entering ExpectRunner.PRE_run() for liveaction_id="%s"',
+            'Entering ExpectRunner.run() for liveaction_id="%s"',
             self.liveaction_id
         )
 
@@ -143,15 +144,16 @@ class ExpectRunner(ActionRunner):
                 self._timeout
             )
 
-            self._init_shell()
-            output = self._get_shell_output()
+            init_output = self._get_shell_output(self._device_profile['init_cmds'])
+            output = self._get_shell_output(self._cmds)
             self._close_shell()
 
             if self._grammar:
                 parsed_output = self._parse_grako(output)
                 result = json.dumps(parsed_output)
             else:
-                result = json.dumps({'stdout': output})
+                result = json.dumps({'result': output,
+                                     'init_output': init_output})
 
             result_status = LIVEACTION_STATUS_SUCCEEDED
 
