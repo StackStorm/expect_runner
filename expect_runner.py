@@ -74,16 +74,20 @@ class ExpectRunner(ActionRunner):
 
         return parsed_output
 
-    def _get_shell_output(self, cmds):
+    def _get_shell_output(self, cmds, expects):
         output = ''
 
-        if not isinstance(cmds, list):
+        if not isinstance(cmds, list) or not isinstance(expects, list):
             raise ValueError("Expected list, got %s" % type(cmds))
 
-        for entry in cmds:
-            # TODO: fix jinja rendering of complex nesting of types in st2
-            cmd = entry[0]
-            expect = entry[1] if len(entry) > 1 else self._config['default_expect']
+        cmds_len = len(cmds) if len(cmds) == len(expects) else None
+
+        if not cmds_len:
+            ValueError("Commands and expects aren't same length")
+
+        for count in range(cmds_len):
+            cmd = cmds[count]
+            expect = expects[count] if expects[count] else self._config['default_expect']
             LOG.debug("Dispatching command: %s, %s", cmd, expect)
             output += self._shell.send(cmd, expect)
 
@@ -103,6 +107,7 @@ class ExpectRunner(ActionRunner):
 
         self._config = {
             'init_cmds': [],
+            'init_expects': [],
             'default_expect': None
         }
 
@@ -118,6 +123,7 @@ class ExpectRunner(ActionRunner):
         self._password = self.runner_parameters.get('password', None)
         self._host = self.runner_parameters.get('host', None)
         self._cmds = self.runner_parameters.get('cmds', None)
+        self._expects = self.runner_parameters.get('expects', None)
         self._entry = self.runner_parameters.get('entry', None)
         self._grammar = self.runner_parameters.get('grammar', None)
         self._timeout = self.runner_parameters.get('timeout', 60)
@@ -144,8 +150,11 @@ class ExpectRunner(ActionRunner):
                 self._timeout
             )
 
-            init_output = self._get_shell_output(self._config['init_cmds'])
-            output = self._get_shell_output(self._cmds)
+            init_output = self._get_shell_output(
+                self._config['init_cmds'],
+                self._config['init_expects']
+            )
+            output = self._get_shell_output(self._cmds, self._expects)
             self._close_shell()
 
             if self._grammar:
@@ -228,7 +237,7 @@ class SSHHandler(ConnectionHandler):
             if (expect and _expect_return(expect, return_val)) or not expect:
                 break
 
-        if not return_val and not _check_timer():
+        if not _check_timer():
             raise TimeoutError()
 
         return return_val

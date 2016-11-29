@@ -26,7 +26,10 @@ from st2tests.base import CleanDbTestCase
 
 RUNNER_PARAMETERS = dict(
     cmds=[
-        ['one happy command']
+        'one happy command'
+    ],
+    expects=[
+        None
     ],
     grammar="""@@whitespace :: /[\t ]+/
     entry = /(?:.|\n)+/;
@@ -39,8 +42,17 @@ RUNNER_PARAMETERS = dict(
 )
 
 MULTIPLE_COMMANDS = [
-    ['one happy command'],
-    ['two happy commands', '#']
+    'one happy command',
+    'two happy commands'
+]
+
+MULTIPLE_EXPECTS = [
+    None,
+    '#'
+]
+
+EXPECT_NOT_IN_OUTPUT = [
+    '{'
 ]
 
 BROKEN_COMMANDS = "very bad command that isn't a list"
@@ -85,6 +97,7 @@ MockParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_OUTPUT
 
 MOCK_CONFIG = {
     'init_cmds': ['enable'],
+    'init_expects': [None],
     'default_expect': '#'
 }
 
@@ -134,6 +147,22 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         self.assertEqual(output['error'], 'Action failed to complete in 0 seconds')
         self.assertEqual(output['exit_code'], -9)
 
+    def test_expect_timeout_on_expect_fail(self, *args):
+        timeout = 1
+        runner = expect_runner.get_runner()
+        runner.action = self._get_mock_action_obj()
+        runner.container_service = service.RunnerContainerService()
+        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters['expects'] = EXPECT_NOT_IN_OUTPUT
+        runner.runner_parameters['timeout'] = timeout
+        runner.pre_run()
+        (status, output, _) = runner.run(runner.action)
+        self.assertEqual(status, LIVEACTION_STATUS_TIMED_OUT)
+        self.assertTrue(output is not None)
+        self.assertEqual(output['result'], None)
+        self.assertEqual(output['error'], 'Action failed to complete in 1 seconds')
+        self.assertEqual(output['exit_code'], -9)
+
     def test_expect_succeeded(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
@@ -163,6 +192,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = dict(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = MULTIPLE_COMMANDS
+        runner.runner_parameters['expects'] = MULTIPLE_EXPECTS
         runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
