@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
 import json
+
+import mock
 import expect_runner
 
 from st2actions.container import service
@@ -41,6 +42,8 @@ MULTIPLE_COMMANDS = [
     ['one happy command'],
     ['two happy commands', '#']
 ]
+
+BROKEN_COMMANDS = "very bad command that isn't a list"
 
 MOCK_COMPLEX_GRAMMAR = """@@whitespace :: /[\t ]+/
 number = /[0-9]+/;
@@ -75,7 +78,8 @@ MOCK_JSON_ENTRIES = """{"entries": [{"name": ["George", "Clooney"],
 MOCK_BROKEN_GRAMMAR = "entry = {/.*/}"
 
 MockParimiko = mock.MagicMock()
-MockParimiko.SSHClient().invoke_shell().recv_ready.return_value = True
+MockParimiko.SSHClient().invoke_shell().recv_ready.side_effect = \
+    lambda: (MockParimiko.SSHClient().invoke_shell().recv_ready.call_count % 2) == 0
 MockParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_OUTPUT
 
 
@@ -113,7 +117,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
 
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
-        self.assertEqual(output, mock_json_entries)
+        self.assertEqual(output['result'], mock_json_entries)
 
     def test_expect_timeout(self, *args):
         timeout = 0
@@ -140,7 +144,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         output = json.loads(output)
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
-        self.assertEqual(output, MOCK_OUTPUT)
+        self.assertEqual(output['result'], MOCK_OUTPUT)
 
     def test_expect_failed(self):
         runner = expect_runner.get_runner()
@@ -157,7 +161,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
     def test_multiple_cmds(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.runner_parameters = RUNNER_PARAMETERS
+        runner.runner_parameters = dict(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = MULTIPLE_COMMANDS
         runner.container_service = service.RunnerContainerService()
         runner.pre_run()
@@ -165,7 +169,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         output = json.loads(output)
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
-        self.assertEqual(output, MOCK_OUTPUT*2)
+        self.assertEqual(output['result'], MOCK_OUTPUT * 2)
 
     def test_paramiko_interface(self):
         runner = expect_runner.get_runner()
@@ -188,7 +192,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
             username=RUNNER_PARAMETERS['username'],
             password=RUNNER_PARAMETERS['password'],
             timeout=RUNNER_PARAMETERS['timeout']
-            )
+        )
         ssh_client.invoke_shell.assert_called()
 
         shell.settimeout.assert_called()
@@ -202,3 +206,27 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         action.pack = 'expect_test_pack'
 
         return action
+
+    def test_cmds_not_list(self):
+        runner = expect_runner.get_runner()
+        runner.action = self._get_mock_action_obj()
+        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters['cmds'] = BROKEN_COMMANDS
+        runner.container_service = service.RunnerContainerService()
+        runner.pre_run()
+        (status, output, _) = runner.run(None)
+        self.assertEqual(status, LIVEACTION_STATUS_FAILED)
+        self.assertEqual(output['error'], "Expected list, got <type 'str'>")
+
+    def test_no_grammar(self):
+        runner = expect_runner.get_runner()
+        runner.action = self._get_mock_action_obj()
+        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters['grammar'] = None
+        runner.container_service = service.RunnerContainerService()
+        runner.pre_run()
+        (status, output, _) = runner.run(None)
+        self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
+        self.assertTrue(output is not None)
+        output = json.loads(output)
+        self.assertEqual(output['result'], MOCK_OUTPUT)

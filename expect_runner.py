@@ -22,7 +22,7 @@ import grako
 
 import paramiko
 
-from st2common.runners import ActionRunner
+from st2common.runners.base import ActionRunner
 from st2common import log as logging
 from st2common.util.config_loader import ContentPackConfigLoader
 from st2common.constants.action import LIVEACTION_STATUS_SUCCEEDED
@@ -77,13 +77,13 @@ class ExpectRunner(ActionRunner):
     def _get_shell_output(self, cmds):
         output = ''
 
-        if not hasattr(cmds, '__iter__'):
-            return None
+        if not isinstance(cmds, list):
+            raise ValueError("Expected list, got %s" % type(cmds))
 
         for entry in cmds:
             # TODO: fix jinja rendering of complex nesting of types in st2
             cmd = entry[0]
-            expect = entry[1] if len(entry) > 1 else self._device_profile['default_expect']
+            expect = entry[1] if len(entry) > 1 else self._config['default_expect']
             LOG.debug("Dispatching command: %s, %s", cmd, expect)
             output += self._shell.send(cmd, expect)
 
@@ -101,8 +101,8 @@ class ExpectRunner(ActionRunner):
             self.liveaction_id
         )
 
-        self._device_profile = {
-            'init_cmds': None,
+        self._config = {
+            'init_cmds': [],
             'default_expect': None
         }
 
@@ -111,8 +111,8 @@ class ExpectRunner(ActionRunner):
 
         LOG.debug("Parsing config: %s, %s", pack, user)
         config_loader = ContentPackConfigLoader(pack_name=pack, user=user)
-        self._device_profile.update(config_loader.get_config())
-        LOG.debug("Config: %s", self._device_profile)
+        self._config.update(config_loader.get_config())
+        LOG.debug("Config: %s", self._config)
 
         self._username = self.runner_parameters.get('username', None)
         self._password = self.runner_parameters.get('password', None)
@@ -144,13 +144,14 @@ class ExpectRunner(ActionRunner):
                 self._timeout
             )
 
-            init_output = self._get_shell_output(self._device_profile['init_cmds'])
+            init_output = self._get_shell_output(self._config['init_cmds'])
             output = self._get_shell_output(self._cmds)
             self._close_shell()
 
             if self._grammar:
                 parsed_output = self._parse_grako(output)
-                result = json.dumps(parsed_output)
+                result = json.dumps({'result': parsed_output,
+                                     'init_output': init_output})
             else:
                 result = json.dumps({'result': output,
                                      'init_output': init_output})
@@ -217,15 +218,15 @@ class SSHHandler(ConnectionHandler):
         while not self._shell.recv_ready() and _check_timer():
             time.sleep(SLEEP_TIMER)
 
-        while self._shell.recv_ready() and _check_timer():
+        while _check_timer():
+            if not self._shell.recv_ready():
+                time.sleep(SLEEP_TIMER)
+                continue
+
             return_val += self._shell.recv(1024)
 
             if (expect and _expect_return(expect, return_val)) or not expect:
                 break
-
-            if not self._shell.recv_ready():
-                time.sleep(SLEEP_TIMER)
-                continue
 
         if not return_val and not _check_timer():
             raise TimeoutError()
