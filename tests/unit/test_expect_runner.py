@@ -104,6 +104,9 @@ MOCK_CONFIG = {
 MockContentPackConfigLoader = mock.MagicMock()
 MockContentPackConfigLoader().get_config().return_value = MOCK_CONFIG
 
+MockNoContentPackConfigLoader = mock.MagicMock()
+MockNoContentPackConfigLoader().get_config().return_value = None
+
 
 @mock.patch('expect_runner.ContentPackConfigLoader', MockContentPackConfigLoader)
 @mock.patch('expect_runner.paramiko', MockParimiko)
@@ -260,3 +263,16 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         self.assertTrue(output is not None)
         output = json.loads(output)
         self.assertEqual(output['result'], MOCK_OUTPUT)
+
+    def test_no_config(self):
+        with mock.patch('expect_runner.ContentPackConfigLoader', MockNoContentPackConfigLoader):
+            runner = expect_runner.get_runner()
+            runner.action = self._get_mock_action_obj()
+            runner.runner_parameters = dict(RUNNER_PARAMETERS)
+            runner.container_service = service.RunnerContainerService()
+            runner.pre_run()
+            (status, output, _) = runner.run(None)
+            self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
+            self.assertTrue(output is not None)
+            output = json.loads(output)
+            self.assertEqual(output['result'], MOCK_OUTPUT)

@@ -116,7 +116,14 @@ class ExpectRunner(ActionRunner):
 
         LOG.debug("Parsing config: %s, %s", pack, user)
         config_loader = ContentPackConfigLoader(pack_name=pack, user=user)
-        self._config.update(config_loader.get_config())
+        config = config_loader.get_config()
+
+        if config:
+            LOG.debug("Loading pack config.")
+            self._config.update(config)
+        else:
+            LOG.debug("No pack config found.")
+
         LOG.debug("Config: %s", self._config)
 
         self._username = self.runner_parameters.get('username', None)
