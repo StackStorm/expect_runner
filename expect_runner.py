@@ -120,7 +120,9 @@ class ExpectRunner(ActionRunner):
 
         if config:
             LOG.debug("Loading pack config.")
-            self._config.update(config)
+            self._config['init_cmds'] = config.get('init_cmds', [])
+            self._config['init_expects'] = config.get('init_expects', [])
+            self._config['default_expect'] = config.get('default_expect', None)
         else:
             LOG.debug("No pack config found.")
 

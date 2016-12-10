@@ -11,6 +11,9 @@
     cmds:
       description: List of commands to execute.
       type: array
+    expects:
+      description: List of expects that match with cmds.
+      type: array
     entry:
       description: Grako grammer entry point.
       type: string

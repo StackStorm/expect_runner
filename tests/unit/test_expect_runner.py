@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import json
 
 import mock
@@ -108,7 +109,11 @@ MockNoContentPackConfigLoader = mock.MagicMock()
 MockNoContentPackConfigLoader().get_config().return_value = None
 
 
-@mock.patch('expect_runner.ContentPackConfigLoader', MockContentPackConfigLoader)
+# @mock.patch('expect_runner.ContentPackConfigLoader', MockContentPackConfigLoader)
+@mock.patch.object(
+    expect_runner.ContentPackConfigLoader,
+    'get_config',
+    mock.MagicMock(return_value=MOCK_CONFIG))
 @mock.patch('expect_runner.paramiko', MockParimiko)
 class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
     register_packs = True
@@ -122,7 +127,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
     def test_grako_parser(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = MOCK_COMPLEX_GRAMMAR
         runner.container_service = service.RunnerContainerService()
         runner.pre_run()
@@ -140,7 +145,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
         runner.container_service = service.RunnerContainerService()
-        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['timeout'] = timeout
         runner.pre_run()
         (status, output, _) = runner.run(runner.action)
@@ -155,7 +160,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
         runner.container_service = service.RunnerContainerService()
-        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['expects'] = EXPECT_NOT_IN_OUTPUT
         runner.runner_parameters['timeout'] = timeout
         runner.pre_run()
@@ -181,7 +186,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
     def test_expect_failed(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = MOCK_BROKEN_GRAMMAR
         runner.container_service = service.RunnerContainerService()
         runner.pre_run()
@@ -193,7 +198,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
     def test_multiple_cmds(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = MULTIPLE_COMMANDS
         runner.runner_parameters['expects'] = MULTIPLE_EXPECTS
         runner.container_service = service.RunnerContainerService()
@@ -243,7 +248,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
     def test_cmds_not_list(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = BROKEN_COMMANDS
         runner.container_service = service.RunnerContainerService()
         runner.pre_run()
@@ -251,10 +256,14 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         self.assertEqual(status, LIVEACTION_STATUS_FAILED)
         self.assertEqual(output['error'], "Expected list, got <type 'str'>")
 
-    def test_no_grammar(self):
+    @mock.patch.object(
+        expect_runner.ContentPackConfigLoader,
+        'get_config',
+        mock.MagicMock(return_value=None))
+    def test_no_grammar_with_no_config(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = None
         runner.container_service = service.RunnerContainerService()
         runner.pre_run()
@@ -263,16 +272,3 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         self.assertTrue(output is not None)
         output = json.loads(output)
         self.assertEqual(output['result'], MOCK_OUTPUT)
-
-    def test_no_config(self):
-        with mock.patch('expect_runner.ContentPackConfigLoader', MockNoContentPackConfigLoader):
-            runner = expect_runner.get_runner()
-            runner.action = self._get_mock_action_obj()
-            runner.runner_parameters = dict(RUNNER_PARAMETERS)
-            runner.container_service = service.RunnerContainerService()
-            runner.pre_run()
-            (status, output, _) = runner.run(None)
-            self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
-            self.assertTrue(output is not None)
-            output = json.loads(output)
-            self.assertEqual(output['result'], MOCK_OUTPUT)
