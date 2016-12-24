@@ -29,9 +29,6 @@ RUNNER_PARAMETERS = dict(
     cmds=[
         'one happy command'
     ],
-    expects=[
-        None
-    ],
     grammar="""@@whitespace :: /[\t ]+/
     entry = /(?:.|\n)+/;
     """,
@@ -44,12 +41,7 @@ RUNNER_PARAMETERS = dict(
 
 MULTIPLE_COMMANDS = [
     'one happy command',
-    'two happy commands'
-]
-
-MULTIPLE_EXPECTS = [
-    None,
-    '#'
+    ['two happy commands', '#']
 ]
 
 EXPECT_NOT_IN_OUTPUT = [
@@ -98,7 +90,6 @@ MockParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_OUTPUT
 
 MOCK_CONFIG = {
     'init_cmds': ['enable'],
-    'init_expects': [None],
     'default_expect': '#'
 }
 
@@ -200,7 +191,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = MULTIPLE_COMMANDS
-        runner.runner_parameters['expects'] = MULTIPLE_EXPECTS
         runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
@@ -254,7 +244,10 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.pre_run()
         (status, output, _) = runner.run(None)
         self.assertEqual(status, LIVEACTION_STATUS_FAILED)
-        self.assertEqual(output['error'], "Expected list, got <type 'str'>")
+        self.assertEqual(
+            output['error'],
+            "Expected list, got %s which is of type <type 'str'>" % (BROKEN_COMMANDS)
+        )
 
     @mock.patch.object(
         expect_runner.ContentPackConfigLoader,

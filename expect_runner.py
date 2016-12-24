@@ -74,20 +74,22 @@ class ExpectRunner(ActionRunner):
 
         return parsed_output
 
-    def _get_shell_output(self, cmds, expects):
+    def _get_shell_output(self, cmds, default_expect):
         output = ''
 
-        if not isinstance(cmds, list) or not isinstance(expects, list):
-            raise ValueError("Expected list, got %s" % type(cmds))
+        if not isinstance(cmds, list):
+            raise ValueError("Expected list, got %s which is of type %s" % (cmds, type(cmds)))
 
-        cmds_len = len(cmds) if len(cmds) == len(expects) else None
+        for cmd_tuple in cmds:
+            if isinstance(cmd_tuple, list):
+                cmd = cmd_tuple.pop(0)
+                expect = cmd_tuple.pop(0)
+            elif isinstance(cmd_tuple, str):
+                cmd = cmd_tuple
+                expect = default_expect
+            else:
+                raise ValueError("Command error. Was not list or string. %s" % (cmd_tuple))
 
-        if not cmds_len:
-            ValueError("Commands and expects aren't same length")
-
-        for count in range(cmds_len):
-            cmd = cmds[count]
-            expect = expects[count] if expects[count] else self._config['default_expect']
             LOG.debug("Dispatching command: %s, %s", cmd, expect)
             output += self._shell.send(cmd, expect)
 
@@ -107,7 +109,6 @@ class ExpectRunner(ActionRunner):
 
         self._config = {
             'init_cmds': [],
-            'init_expects': [],
             'default_expect': None
         }
 
@@ -121,7 +122,6 @@ class ExpectRunner(ActionRunner):
         if config:
             LOG.debug("Loading pack config.")
             self._config['init_cmds'] = config.get('init_cmds', [])
-            self._config['init_expects'] = config.get('init_expects', [])
             self._config['default_expect'] = config.get('default_expect', None)
         else:
             LOG.debug("No pack config found.")
@@ -132,7 +132,6 @@ class ExpectRunner(ActionRunner):
         self._password = self.runner_parameters.get('password', None)
         self._host = self.runner_parameters.get('host', None)
         self._cmds = self.runner_parameters.get('cmds', None)
-        self._expects = self.runner_parameters.get('expects', None)
         self._entry = self.runner_parameters.get('entry', None)
         self._grammar = self.runner_parameters.get('grammar', None)
         self._timeout = self.runner_parameters.get('timeout', 60)
@@ -161,9 +160,9 @@ class ExpectRunner(ActionRunner):
 
             init_output = self._get_shell_output(
                 self._config['init_cmds'],
-                self._config['init_expects']
+                self._config['default_expect']
             )
-            output = self._get_shell_output(self._cmds, self._expects)
+            output = self._get_shell_output(self._cmds, self._config['default_expect'])
             self._close_shell()
 
             if self._grammar:
