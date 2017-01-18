@@ -13,8 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
+import copy
 import json
+
+import mock
 import expect_runner
 
 from st2actions.container import service
@@ -39,8 +41,14 @@ RUNNER_PARAMETERS = dict(
 
 MULTIPLE_COMMANDS = [
     'one happy command',
-    'two happy commands'
+    ['two happy commands', '#']
 ]
+
+EXPECT_NOT_IN_OUTPUT = [
+    '{'
+]
+
+BROKEN_COMMANDS = "very bad command that isn't a list"
 
 MOCK_COMPLEX_GRAMMAR = """@@whitespace :: /[\t ]+/
 number = /[0-9]+/;
@@ -75,9 +83,28 @@ MOCK_JSON_ENTRIES = """{"entries": [{"name": ["George", "Clooney"],
 MOCK_BROKEN_GRAMMAR = "entry = {/.*/}"
 
 MockParimiko = mock.MagicMock()
-MockParimiko.SSHClient().invoke_shell().recv_ready.return_value = True
+MockParimiko.SSHClient().invoke_shell().recv_ready.side_effect = \
+    lambda: (MockParimiko.SSHClient().invoke_shell().recv_ready.call_count % 2) == 0
 MockParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_OUTPUT
 
+
+MOCK_CONFIG = {
+    'init_cmds': ['enable'],
+    'default_expect': '#'
+}
+
+MockContentPackConfigLoader = mock.MagicMock()
+MockContentPackConfigLoader().get_config().return_value = MOCK_CONFIG
+
+MockNoContentPackConfigLoader = mock.MagicMock()
+MockNoContentPackConfigLoader().get_config().return_value = None
+
+
+# @mock.patch('expect_runner.ContentPackConfigLoader', MockContentPackConfigLoader)
+@mock.patch.object(
+    expect_runner.ContentPackConfigLoader,
+    'get_config',
+    mock.MagicMock(return_value=MOCK_CONFIG))
 @mock.patch('expect_runner.paramiko', MockParimiko)
 class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
     register_packs = True
@@ -91,7 +118,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
     def test_grako_parser(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = MOCK_COMPLEX_GRAMMAR
         runner.container_service = service.RunnerContainerService()
         runner.pre_run()
@@ -102,14 +129,14 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
 
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
-        self.assertEqual(output, mock_json_entries)
+        self.assertEqual(output['result'], mock_json_entries)
 
     def test_expect_timeout(self, *args):
         timeout = 0
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
         runner.container_service = service.RunnerContainerService()
-        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['timeout'] = timeout
         runner.pre_run()
         (status, output, _) = runner.run(runner.action)
@@ -117,6 +144,22 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         self.assertTrue(output is not None)
         self.assertEqual(output['result'], None)
         self.assertEqual(output['error'], 'Action failed to complete in 0 seconds')
+        self.assertEqual(output['exit_code'], -9)
+
+    def test_expect_timeout_on_expect_fail(self, *args):
+        timeout = 1
+        runner = expect_runner.get_runner()
+        runner.action = self._get_mock_action_obj()
+        runner.container_service = service.RunnerContainerService()
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
+        runner.runner_parameters['expects'] = EXPECT_NOT_IN_OUTPUT
+        runner.runner_parameters['timeout'] = timeout
+        runner.pre_run()
+        (status, output, _) = runner.run(runner.action)
+        self.assertEqual(status, LIVEACTION_STATUS_TIMED_OUT)
+        self.assertTrue(output is not None)
+        self.assertEqual(output['result'], None)
+        self.assertEqual(output['error'], 'Action failed to complete in 1 seconds')
         self.assertEqual(output['exit_code'], -9)
 
     def test_expect_succeeded(self):
@@ -129,12 +172,12 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         output = json.loads(output)
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
-        self.assertEqual(output, MOCK_OUTPUT)
+        self.assertEqual(output['result'], MOCK_OUTPUT)
 
     def test_expect_failed(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.runner_parameters = dict(RUNNER_PARAMETERS)
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = MOCK_BROKEN_GRAMMAR
         runner.container_service = service.RunnerContainerService()
         runner.pre_run()
@@ -146,7 +189,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
     def test_multiple_cmds(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.runner_parameters = RUNNER_PARAMETERS
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = MULTIPLE_COMMANDS
         runner.container_service = service.RunnerContainerService()
         runner.pre_run()
@@ -154,7 +197,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         output = json.loads(output)
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
-        self.assertEqual(output, MOCK_OUTPUT*2)
+        self.assertEqual(output['result'], MOCK_OUTPUT * 2)
 
     def test_paramiko_interface(self):
         runner = expect_runner.get_runner()
@@ -177,7 +220,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
             username=RUNNER_PARAMETERS['username'],
             password=RUNNER_PARAMETERS['password'],
             timeout=RUNNER_PARAMETERS['timeout']
-            )
+        )
         ssh_client.invoke_shell.assert_called()
 
         shell.settimeout.assert_called()
@@ -191,3 +234,34 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         action.pack = 'expect_test_pack'
 
         return action
+
+    def test_cmds_not_list(self):
+        runner = expect_runner.get_runner()
+        runner.action = self._get_mock_action_obj()
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
+        runner.runner_parameters['cmds'] = BROKEN_COMMANDS
+        runner.container_service = service.RunnerContainerService()
+        runner.pre_run()
+        (status, output, _) = runner.run(None)
+        self.assertEqual(status, LIVEACTION_STATUS_FAILED)
+        self.assertEqual(
+            output['error'],
+            "Expected list, got %s which is of type <type 'str'>" % (BROKEN_COMMANDS)
+        )
+
+    @mock.patch.object(
+        expect_runner.ContentPackConfigLoader,
+        'get_config',
+        mock.MagicMock(return_value=None))
+    def test_no_grammar_with_no_config(self):
+        runner = expect_runner.get_runner()
+        runner.action = self._get_mock_action_obj()
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
+        runner.runner_parameters['grammar'] = None
+        runner.container_service = service.RunnerContainerService()
+        runner.pre_run()
+        (status, output, _) = runner.run(None)
+        self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
+        self.assertTrue(output is not None)
+        output = json.loads(output)
+        self.assertEqual(output['result'], MOCK_OUTPUT)
