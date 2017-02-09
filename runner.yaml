@@ -1,9 +1,9 @@
 - aliases: []
   description: |
-    The expect runner is used for interaction with shell devices with no API
-    for gathering the desired data. You can specifiy a list of commands to run
-    along with their expected returns. Once the output has been collected you
-    can parse the return for the data you need using Grako's EBNF parser.
+    The expect runner is used for interaction with CLI-only devices that lack
+    APIs. You can specify a list of commands to run, along with their expected
+    responses. Once the output has been collected you can parse the data using
+    Grako's EBNF parser.
   enabled: true
   name: expect
   runner_module: expect_runner
