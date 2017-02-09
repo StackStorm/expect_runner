@@ -15,10 +15,10 @@
       description: List of expects that match with cmds.
       type: array
     entry:
-      description: Grako grammer entry point.
+      description: Grako grammar entry point.
       type: string
     grammar:
-      description: Grako EBNF grammar for pasring output.
+      description: Grako EBNF grammar for parsing output.
       type: string
     host:
       description: Host to connect to.
