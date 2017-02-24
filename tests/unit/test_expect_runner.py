@@ -44,6 +44,10 @@ MULTIPLE_COMMANDS = [
     ['two happy commands', '#']
 ]
 
+NONE_COMMANDS = [
+    ['one happy command', None]
+]
+
 EXPECT_NOT_IN_OUTPUT = [
     '{'
 ]
@@ -265,3 +269,17 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         self.assertTrue(output is not None)
         output = json.loads(output)
         self.assertEqual(output['result'], MOCK_OUTPUT)
+
+    def test_none_expect(self):
+        runner = expect_runner.get_runner()
+        runner.action = self._get_mock_action_obj()
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
+        runner.runner_parameters['cmds'] = NONE_COMMANDS
+        runner.container_service = service.RunnerContainerService()
+        runner.pre_run()
+        (status, output, _) = runner.run(None)
+        output = output
+        self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
+        self.assertTrue(output is not None)
+        output = json.loads(output)
+        self.assertEqual(output['result'], '')

@@ -95,7 +95,10 @@ class ExpectRunner(ActionRunner):
                                  " or list was of incorrect length. %s" % (cmd_tuple))
 
             LOG.debug("Dispatching command: %s, %s", cmd, expect)
-            output += self._shell.send(cmd, expect)
+
+            result = self._shell.send(cmd, expect)
+
+            output += result if result else ''
 
         return output
 
@@ -169,7 +172,7 @@ class ExpectRunner(ActionRunner):
             output = self._get_shell_output(self._cmds, self._config['default_expect'])
             self._close_shell()
 
-            if self._grammar:
+            if self._grammar and len(output) > 0:
                 parsed_output = self._parse_grako(output)
                 result = json.dumps({'result': parsed_output,
                                      'init_output': init_output})
@@ -222,14 +225,17 @@ class SSHHandler(ConnectionHandler):
 
     def send(self, command, expect):
         self._shell.settimeout(_remaining_time())
-        LOG.debug('Entering _get_ssh_output')
+        LOG.debug('Entering send')
 
         self._shell.send(command + "\n")
 
-        output = self._recv(expect)
+        output = None
 
-        LOG.debug('Output: %s', output)
-        output = output.replace('\\n', '\n').replace('\\r', '')
+        if expect:
+            output = self._recv(expect)
+
+            LOG.debug('Output: %s', output)
+            output = output.replace('\\n', '\n').replace('\\r', '')
 
         return output
 
