@@ -95,7 +95,10 @@ class ExpectRunner(ActionRunner):
                                  " or list was of incorrect length. %s" % (cmd_tuple))
 
             LOG.debug("Dispatching command: %s, %s", cmd, expect)
-            output += self._shell.send(cmd, expect)
+
+            result = self._shell.send(cmd, expect)
+
+            output += result if result else ''
 
         return output
 
@@ -169,7 +172,7 @@ class ExpectRunner(ActionRunner):
             output = self._get_shell_output(self._cmds, self._config['default_expect'])
             self._close_shell()
 
-            if self._grammar:
+            if self._grammar and len(output) > 0:
                 parsed_output = self._parse_grako(output)
                 result = json.dumps({'result': parsed_output,
                                      'init_output': init_output})
@@ -180,7 +183,7 @@ class ExpectRunner(ActionRunner):
             result_status = LIVEACTION_STATUS_SUCCEEDED
 
         except (TimeoutError, socket.timeout) as e:
-            LOG.debug("Timed out running action.")
+            LOG.debug("Timed out running action: %s", e)
             result_status = LIVEACTION_STATUS_TIMED_OUT
             error_message = dict(
                 result=None,
@@ -222,35 +225,48 @@ class SSHHandler(ConnectionHandler):
 
     def send(self, command, expect):
         self._shell.settimeout(_remaining_time())
-        LOG.debug('Entering _get_ssh_output')
+        LOG.debug('Entering send')
 
-        self._shell.send(command + "\n")
+        if not command and not expect:
+            raise ValueError("Expect and command cannot both be NoneType.")
 
-        output = self._recv(expect)
+        if command:
+            self._shell.send(command + "\n")
+        else:
+            output = self._recv(expect, True)
+            return output
 
-        LOG.debug('Output: %s', output)
-        output = output.replace('\\n', '\n').replace('\\r', '')
+        output = None
+
+        if expect:
+            output = self._recv(expect)
+
+            LOG.debug('Output: %s', output)
+            output = output.replace('\\n', '\n').replace('\\r', '')
 
         return output
 
-    def _recv(self, expect=None):
+    def _recv(self, expect=None, continue_return=False):
         return_val = ''
 
         while not self._shell.recv_ready() and _check_timer():
+            if continue_return:
+                self._shell.send("\n")
             time.sleep(SLEEP_TIMER)
 
         while _check_timer():
             if not self._shell.recv_ready():
+                self._shell.send("\n")
                 time.sleep(SLEEP_TIMER)
                 continue
-
-            return_val += self._shell.recv(1024)
+            output = self._shell.recv(1024)
+            return_val += output if output else ''
 
             if (expect and _expect_return(expect, return_val)) or not expect:
                 break
 
         if not _check_timer():
-            raise TimeoutError()
+            raise TimeoutError("Reached timeout (%s seconds). Recieved: %s" % (TIMEOUT, return_val))
 
         return return_val
 
