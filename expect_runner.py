@@ -183,7 +183,7 @@ class ExpectRunner(ActionRunner):
             result_status = LIVEACTION_STATUS_SUCCEEDED
 
         except (TimeoutError, socket.timeout) as e:
-            LOG.debug("Timed out running action.")
+            LOG.debug("Timed out running action: %s", e)
             result_status = LIVEACTION_STATUS_TIMED_OUT
             error_message = dict(
                 result=None,
@@ -227,7 +227,14 @@ class SSHHandler(ConnectionHandler):
         self._shell.settimeout(_remaining_time())
         LOG.debug('Entering send')
 
-        self._shell.send(command + "\n")
+        if not command and not expect:
+            raise ValueError("Expect and command cannot both be NoneType.")
+
+        if command:
+            self._shell.send(command + "\n")
+        else:
+            output = self._recv(expect, True)
+            return output
 
         output = None
 
@@ -239,24 +246,27 @@ class SSHHandler(ConnectionHandler):
 
         return output
 
-    def _recv(self, expect=None):
+    def _recv(self, expect=None, continue_return=False):
         return_val = ''
 
         while not self._shell.recv_ready() and _check_timer():
+            if continue_return:
+                self._shell.send("\n")
             time.sleep(SLEEP_TIMER)
 
         while _check_timer():
             if not self._shell.recv_ready():
+                self._shell.send("\n")
                 time.sleep(SLEEP_TIMER)
                 continue
-
-            return_val += self._shell.recv(1024)
+            output = self._shell.recv(1024)
+            return_val += output if output else ''
 
             if (expect and _expect_return(expect, return_val)) or not expect:
                 break
 
         if not _check_timer():
-            raise TimeoutError()
+            raise TimeoutError("Reached timeout (%s seconds). Recieved: %s" % (TIMEOUT, return_val))
 
         return return_val
 

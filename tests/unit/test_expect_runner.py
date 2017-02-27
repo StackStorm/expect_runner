@@ -44,8 +44,16 @@ MULTIPLE_COMMANDS = [
     ['two happy commands', '#']
 ]
 
-NONE_COMMANDS = [
+NONE_EXPECT = [
     ['one happy command', None]
+]
+
+NONE_COMMANDS = [
+    [None, '#']
+]
+
+NONE_EXPECT_COMMANDS = [
+    [None, None]
 ]
 
 EXPECT_NOT_IN_OUTPUT = [
@@ -274,7 +282,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
-        runner.runner_parameters['cmds'] = NONE_COMMANDS
+        runner.runner_parameters['cmds'] = NONE_EXPECT
         runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
@@ -283,3 +291,30 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         self.assertTrue(output is not None)
         output = json.loads(output)
         self.assertEqual(output['result'], '')
+
+    def test_none_cmd(self):
+        runner = expect_runner.get_runner()
+        runner.action = self._get_mock_action_obj()
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
+        runner.runner_parameters['cmds'] = NONE_COMMANDS
+        runner.container_service = service.RunnerContainerService()
+        runner.pre_run()
+        (status, output, _) = runner.run(None)
+        output = output
+        self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
+        self.assertTrue(output is not None)
+        output = json.loads(output)
+        self.assertEqual(output['result'], MOCK_OUTPUT)
+
+    def test_none_cmd_expect(self):
+        runner = expect_runner.get_runner()
+        runner.action = self._get_mock_action_obj()
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
+        runner.runner_parameters['cmds'] = NONE_EXPECT_COMMANDS
+        runner.container_service = service.RunnerContainerService()
+        runner.pre_run()
+        (status, output, _) = runner.run(None)
+        output = output
+        self.assertEqual(status, LIVEACTION_STATUS_FAILED)
+        self.assertTrue(output is not None)
+        self.assertEqual(output['error'], 'Expect and command cannot both be NoneType.')
