@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Licensed to the StackStorm, Inc ('StackStorm') under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -84,6 +85,23 @@ MOCK_OUTPUT = """This is example output of a shell. It contains entries one
     SSH@MyHappyShell>
     SSH@MyHappyShell#
     """
+
+MOCK_UNICODE_OUTPUT = (
+    u"""
+    This is example output of a shell. It contains entries one
+    can parse and also this text that you can choose to ignore. The list is
+    of random actors. The age/birthday info is bogus...
+    #   Name                 Birthday Month   Age
+    1   George Clooney       Januaray         21
+    2   Emma Stone           December         22
+    3   Leonardo Dicaprio    July             14
+    4   Margot Robbie        September        76
+    5   Kevin Bacon          May              194
+    œ
+    SSH@MyHappyShell>
+    SSH@MyHappyShell#
+    """
+)
 
 MOCK_JSON_ENTRIES = """{"entries": [{"name": ["George", "Clooney"],
 "birthday_month": "Januaray", "age": "21"}, {"name": ["Emma", "Stone"],
@@ -318,3 +336,22 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         self.assertEqual(status, LIVEACTION_STATUS_FAILED)
         self.assertTrue(output is not None)
         self.assertEqual(output['error'], 'Expect and command cannot both be NoneType.')
+
+    def test_unicode_response(self):
+        MockUnicodeParimiko = mock.MagicMock()
+        MockUnicodeParimiko.SSHClient().invoke_shell().recv_ready.side_effect = \
+            lambda: (MockParimiko.SSHClient().invoke_shell().recv_ready.call_count % 2) == 0
+        MockUnicodeParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_UNICODE_OUTPUT
+
+        with mock.patch('expect_runner.paramiko', MockUnicodeParimiko):
+            runner = expect_runner.get_runner()
+            runner.action = self._get_mock_action_obj()
+            runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
+            runner.container_service = service.RunnerContainerService()
+            runner.pre_run()
+            (status, output, _) = runner.run(None)
+            output = output
+            self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
+            self.assertTrue(output is not None)
+            output = json.loads(output)
+            self.assertEqual(output['result'], MOCK_UNICODE_OUTPUT)

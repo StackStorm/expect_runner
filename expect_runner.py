@@ -256,14 +256,16 @@ class SSHHandler(ConnectionHandler):
 
         while _check_timer():
             if not self._shell.recv_ready():
-                self._shell.send("\n")
                 time.sleep(SLEEP_TIMER)
                 continue
-            output = self._shell.recv(1024)
-            return_val += output if output else ''
+            output = unicode(self._shell.recv(1024))
+            return_val += output if output else u''
 
             if (expect and _expect_return(expect, return_val)) or not expect:
                 break
+
+            if continue_return:
+                self._shell.send("\n")
 
         if not _check_timer():
             raise TimeoutError("Reached timeout (%s seconds). Recieved: %s" % (TIMEOUT, return_val))
