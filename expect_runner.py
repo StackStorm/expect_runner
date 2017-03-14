@@ -258,7 +258,7 @@ class SSHHandler(ConnectionHandler):
             if not self._shell.recv_ready():
                 time.sleep(SLEEP_TIMER)
                 continue
-            output = unicode(self._shell.recv(1024))
+            output = self._shell.recv(1024).decode('UTF-8')
             return_val += output if output else u''
 
             if (expect and _expect_return(expect, return_val)) or not expect:
