@@ -75,7 +75,7 @@ class ExpectRunner(ActionRunner):
         return parsed_output
 
     def _get_shell_output(self, cmds, default_expect):
-        output = ''
+        output = u''
 
         if not isinstance(cmds, list):
             raise ValueError("Expected list, got %s which is of type %s" % (cmds, type(cmds)))
@@ -98,7 +98,7 @@ class ExpectRunner(ActionRunner):
 
             result = self._shell.send(cmd, expect)
 
-            output += result if result else ''
+            output += result if result else u''
 
         return output
 
@@ -256,14 +256,16 @@ class SSHHandler(ConnectionHandler):
 
         while _check_timer():
             if not self._shell.recv_ready():
-                self._shell.send("\n")
                 time.sleep(SLEEP_TIMER)
                 continue
-            output = self._shell.recv(1024)
-            return_val += output if output else ''
+            output = unicode(self._shell.recv(1024), errors='ignore')
+            return_val += output if output else u''
 
             if (expect and _expect_return(expect, return_val)) or not expect:
                 break
+
+            if continue_return:
+                self._shell.send("\n")
 
         if not _check_timer():
             raise TimeoutError("Reached timeout (%s seconds). Recieved: %s" % (TIMEOUT, return_val))
