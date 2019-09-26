@@ -7,6 +7,7 @@
   enabled: true
   name: expect
   runner_module: expect_runner
+  output_key: result
   runner_parameters:
     cmds:
       description: List of commands to execute.

@@ -18,9 +18,8 @@ import copy
 import json
 
 import mock
-import expect_runner
+from expect_runner import expect_runner
 
-from st2actions.container import service
 from st2common.constants.action import LIVEACTION_STATUS_SUCCEEDED, LIVEACTION_STATUS_FAILED
 from st2common.constants.action import LIVEACTION_STATUS_TIMED_OUT
 from st2tests.base import RunnerTestCase
@@ -147,12 +146,11 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         self.assertTrue(runner is not None, 'Creation failed. No instance.')
         self.assertEqual(type(runner), expect_runner.ExpectRunner, 'Creation failed. No instance.')
 
-    def test_grako_parser(self):
+    def test_tatsu_parser(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = MOCK_COMPLEX_GRAMMAR
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
 
@@ -167,7 +165,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         timeout = 0
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.container_service = service.RunnerContainerService()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['timeout'] = timeout
         runner.pre_run()
@@ -182,7 +179,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         timeout = 1
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.container_service = service.RunnerContainerService()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['expects'] = EXPECT_NOT_IN_OUTPUT
         runner.runner_parameters['timeout'] = timeout
@@ -198,7 +194,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = RUNNER_PARAMETERS
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         output = json.loads(output)
@@ -211,7 +206,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = MOCK_BROKEN_GRAMMAR
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         self.assertEqual(status, LIVEACTION_STATUS_FAILED)
@@ -223,7 +217,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = MULTIPLE_COMMANDS
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         output = json.loads(output)
@@ -235,7 +228,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = RUNNER_PARAMETERS
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
 
@@ -272,7 +264,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = BROKEN_COMMANDS
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         self.assertEqual(status, LIVEACTION_STATUS_FAILED)
@@ -290,7 +281,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = None
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
@@ -303,7 +293,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = NONE_EXPECT
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         output = output
@@ -317,7 +306,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = NONE_COMMANDS
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         output = output
@@ -331,7 +319,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = NONE_EXPECT_COMMANDS
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         output = output
@@ -349,7 +336,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
             runner = expect_runner.get_runner()
             runner.action = self._get_mock_action_obj()
             runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
-            runner.container_service = service.RunnerContainerService()
             runner.pre_run()
             (status, output, _) = runner.run(None)
             output = output
@@ -368,7 +354,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
             runner = expect_runner.get_runner()
             runner.action = self._get_mock_action_obj()
             runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
-            runner.container_service = service.RunnerContainerService()
             runner.pre_run()
             (status, output, _) = runner.run(None)
             output = output
