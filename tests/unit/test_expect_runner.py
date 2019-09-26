@@ -18,7 +18,7 @@ import copy
 import json
 
 import mock
-import expect_runner
+import expect_runner.expect_runner
 
 from st2actions.container import service
 from st2common.constants.action import LIVEACTION_STATUS_SUCCEEDED, LIVEACTION_STATUS_FAILED

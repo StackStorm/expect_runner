@@ -23,6 +23,7 @@ import grako
 import paramiko
 
 from st2common.runners.base import ActionRunner
+from st2common.runners.base import get_metadata as get_runner_metadata
 from st2common import log as logging
 from st2common.util.config_loader import ContentPackConfigLoader
 from st2common.constants.action import LIVEACTION_STATUS_SUCCEEDED
@@ -64,6 +65,10 @@ def _expect_return(expect, output):
 
 def get_runner():
     return ExpectRunner(str(uuid.uuid4()))
+
+
+def get_metadata():
+    return get_runner_metadata('expect_runner')[0]
 
 
 class ExpectRunner(ActionRunner):
