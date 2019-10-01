@@ -17,7 +17,6 @@ import uuid
 import time
 import socket
 import re
-import json
 import grako
 
 import paramiko
@@ -179,11 +178,11 @@ class ExpectRunner(ActionRunner):
 
             if self._grammar and len(output) > 0:
                 parsed_output = self._parse_grako(output)
-                result = json.dumps({'result': parsed_output,
-                                     'init_output': init_output})
+                result = {'result': parsed_output,
+                          'init_output': init_output}
             else:
-                result = json.dumps({'result': output,
-                                     'init_output': init_output})
+                result = {'result': output,
+                          'init_output': init_output}
 
             result_status = LIVEACTION_STATUS_SUCCEEDED
 
