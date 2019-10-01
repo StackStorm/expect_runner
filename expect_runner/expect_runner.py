@@ -17,9 +17,9 @@ import uuid
 import time
 import socket
 import re
-import grako
 
 import paramiko
+import tatsu
 
 from st2common.runners.base import ActionRunner
 from st2common.runners.base import get_metadata as get_runner_metadata
@@ -71,8 +71,8 @@ def get_metadata():
 
 
 class ExpectRunner(ActionRunner):
-    def _parse_grako(self, output):
-        parser = grako.genmodel("output_parser", self._grammar)
+    def _parse_tatsu(self, output):
+        parser = tatsu.genmodel("output_parser", self._grammar)
         parsed_output = parser.parse(output, self._entry)
         LOG.info('Parsed output: %s', parsed_output)
 
@@ -177,7 +177,7 @@ class ExpectRunner(ActionRunner):
             self._close_shell()
 
             if self._grammar and len(output) > 0:
-                parsed_output = self._parse_grako(output)
+                parsed_output = self._parse_tatsu(output)
                 result = {'result': parsed_output,
                           'init_output': init_output}
             else:

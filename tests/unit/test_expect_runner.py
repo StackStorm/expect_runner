@@ -147,7 +147,7 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         self.assertTrue(runner is not None, 'Creation failed. No instance.')
         self.assertEqual(type(runner), expect_runner.ExpectRunner, 'Creation failed. No instance.')
 
-    def test_grako_parser(self):
+    def test_tatsu_parser(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
