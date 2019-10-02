@@ -18,7 +18,7 @@ import time
 import socket
 import re
 import json
-import grako
+import tatsu
 
 import paramiko
 
@@ -72,9 +72,9 @@ def get_metadata():
 
 
 class ExpectRunner(ActionRunner):
-    def _parse_grako(self, output):
-        parser = grako.genmodel("output_parser", self._grammar)
-        parsed_output = parser.parse(output, self._entry)
+    def _parse(self, output):
+        model = tatsu.compile(self._grammar)
+        parsed_output = model.parse(output, start=self._entry)
         LOG.info('Parsed output: %s', parsed_output)
 
         return parsed_output
@@ -178,7 +178,7 @@ class ExpectRunner(ActionRunner):
             self._close_shell()
 
             if self._grammar and len(output) > 0:
-                parsed_output = self._parse_grako(output)
+                parsed_output = self._parse(output)
                 result = json.dumps({'result': parsed_output,
                                      'init_output': init_output})
             else:
