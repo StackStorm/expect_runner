@@ -250,8 +250,8 @@ class SSHHandler(ConnectionHandler):
         if expect:
             output = self._recv(expect)
 
+            output = output.replace('\\n', '\n').replace('\r', '').replace('\\r', '')
             LOG.debug('Output: %s', output)
-            output = output.replace('\\n', '\n').replace('\\r', '')
 
         return output
 
