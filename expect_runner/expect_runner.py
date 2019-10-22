@@ -245,8 +245,7 @@ class SSHHandler(ConnectionHandler):
         if command:
             self._shell.send(command + "\n")
         else:
-            output = self._recv(expect, True)
-            return output
+            return self._recv(expect, True)
 
         output = None
 
