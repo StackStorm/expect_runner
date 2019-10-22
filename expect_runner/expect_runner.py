@@ -225,7 +225,7 @@ class SSHHandler(ConnectionHandler):
             password=password,
             timeout=timeout
         )
-        self._shell = self._ssh.invoke_shell()
+        self._shell = self._ssh.invoke_shell(term='vt100', width=200, height=200)
         self._shell.settimeout(_remaining_time())
         self._recv()
 
