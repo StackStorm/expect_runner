@@ -262,13 +262,33 @@ class SSHHandler(ConnectionHandler):
         LOG.debug("  receiving (%s, %s)", expect, continue_return)
         return_val = ''
 
-        while not self._shell.recv_ready() and _check_timer():
+        while not self._shell.recv_ready() and not self._shell.recv_stderr_ready() and _check_timer():
             LOG.debug("  waiting for shell to be ready...")
             if continue_return:
                 LOG.debug("    sending newline")
                 self._shell.send("\n")
             LOG.debug("    sleeping for %s", SLEEP_TIMER)
             time.sleep(SLEEP_TIMER)
+
+        # If we have an error, return it
+        # Note that since this is an error, we ignore the timeout timer when
+        # trying to get the error message
+        if self._shell.recv_stderr_ready():
+            LOG.debug("Command encountered error")
+            # Note: an excellent place for Python 3.8's "walrus" operator here
+            error = 'notblank'
+            while error != '':
+                LOG.debug("  receiving 1024 characters from shell")
+                error = self._shell.recv_stderr(1024)
+                LOG.debug("  received %s bytes", len(error))
+                if isinstance(error, bytes):
+                    try:
+                        error = error.decode('utf-8')
+                    except UnicodeDecodeError:
+                        error = str(error, errors='ignore')
+                LOG.debug("  error from shell.recv_stderr(): %s", error)
+                return_val += error if error else ''
+            return return_val
 
         # While we still haven't timed out, keep checking for and grabbing
         # output from the command and comparing it to the expect
