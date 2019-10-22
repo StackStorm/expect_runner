@@ -86,6 +86,7 @@ class ExpectRunner(ActionRunner):
             raise ValueError("Expected list, got %s which is of type %s" % (cmds, type(cmds)))
 
         for cmd_tuple in cmds:
+            LOG.debug("expect runner cmds: %s", cmd_tuple)
             if isinstance(cmd_tuple, list) and len(cmd_tuple) == 2:
                 cmd = cmd_tuple.pop(0)
                 expect = cmd_tuple.pop(0)
@@ -174,7 +175,9 @@ class ExpectRunner(ActionRunner):
                 self._config['init_cmds'],
                 self._config['default_expect']
             )
+            LOG.debug("initial shell output: %s", output)
             output = self._get_shell_output(self._cmds, self._config['default_expect'])
+            LOG.debug("shell output: %s", output)
             self._close_shell()
 
             if self._grammar and len(output) > 0:
@@ -234,7 +237,7 @@ class SSHHandler(ConnectionHandler):
 
     def send(self, command, expect):
         self._shell.settimeout(_remaining_time())
-        LOG.debug('Entering send')
+        LOG.debug('Entering send: (%s, %s)', command, expect)
 
         if not command and not expect:
             raise ValueError("Expect and command cannot both be NoneType.")
@@ -256,29 +259,46 @@ class SSHHandler(ConnectionHandler):
         return output
 
     def _recv(self, expect=None, continue_return=False):
+        LOG.debug("  receiving (%s, %s)", expect, continue_return)
         return_val = ''
 
         while not self._shell.recv_ready() and _check_timer():
+            LOG.debug("  waiting for shell to be ready...")
             if continue_return:
+                LOG.debug("    sending newline")
                 self._shell.send("\n")
+            LOG.debug("    sleeping for %s", SLEEP_TIMER)
             time.sleep(SLEEP_TIMER)
 
+        # While we still haven't timed out, keep checking for and grabbing
+        # output from the command and comparing it to the expect
+        # Break once we have what we expect, otherwise keep waiting until
+        # timeout
         while _check_timer():
+            # Double check that the command has output available for us
             if not self._shell.recv_ready():
+                LOG.debug("  shell not ready, sleeping %s", SLEEP_TIMER)
                 time.sleep(SLEEP_TIMER)
                 continue
+            LOG.debug("  receiving 1024 characters from shell")
             output = self._shell.recv(1024)
+            LOG.debug("  received %s bytes", len(output))
             if isinstance(output, bytes):
                 try:
                     output = output.decode('utf-8')
                 except UnicodeDecodeError:
                     output = str(output, errors='ignore')
+            LOG.debug("  output from shell.recv(): %s", output)
             return_val += output if output else ''
 
+            LOG.debug("  expect: %s", expect)
+            LOG.debug("  return val: %s", return_val)
             if (expect and _expect_return(expect, return_val)) or not expect:
+                LOG.debug("    expect matched return value")
                 break
 
             if continue_return:
+                LOG.debug("  sending newline")
                 self._shell.send("\n")
 
         if not _check_timer():
