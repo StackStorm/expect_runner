@@ -175,7 +175,7 @@ class ExpectRunner(ActionRunner):
                 self._config['init_cmds'],
                 self._config['default_expect']
             )
-            LOG.debug("initial shell output: %s", output)
+            LOG.debug("initial shell output: %s", init_output)
             output = self._get_shell_output(self._cmds, self._config['default_expect'])
             LOG.debug("shell output: %s", output)
             self._close_shell()
