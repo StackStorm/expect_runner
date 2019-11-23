@@ -80,12 +80,13 @@ class ExpectRunner(ActionRunner):
         return parsed_output
 
     def _get_shell_output(self, cmds, default_expect):
-        output = u''
+        output = ''
 
         if not isinstance(cmds, list):
             raise ValueError("Expected list, got %s which is of type %s" % (cmds, type(cmds)))
 
         for cmd_tuple in cmds:
+            LOG.debug("expect runner cmds: %s", cmd_tuple)
             if isinstance(cmd_tuple, list) and len(cmd_tuple) == 2:
                 cmd = cmd_tuple.pop(0)
                 expect = cmd_tuple.pop(0)
@@ -103,7 +104,7 @@ class ExpectRunner(ActionRunner):
 
             result = self._shell.send(cmd, expect)
 
-            output += result if result else u''
+            output += result if result else ''
 
         return output
 
@@ -174,16 +175,22 @@ class ExpectRunner(ActionRunner):
                 self._config['init_cmds'],
                 self._config['default_expect']
             )
+            LOG.debug("initial shell output: %s", output)
             output = self._get_shell_output(self._cmds, self._config['default_expect'])
+            LOG.debug("shell output: %s", output)
             self._close_shell()
 
             if self._grammar and len(output) > 0:
                 parsed_output = self._parse(output)
-                result = json.dumps({'result': parsed_output,
-                                     'init_output': init_output})
+                result = {
+                    'result': parsed_output,
+                    'init_output': init_output,
+                }
             else:
-                result = json.dumps({'result': output,
-                                     'init_output': init_output})
+                result = {
+                    'result': output,
+                    'init_output': init_output,
+                }
 
             result_status = LIVEACTION_STATUS_SUCCEEDED
 
@@ -221,7 +228,7 @@ class SSHHandler(ConnectionHandler):
             password=password,
             timeout=timeout
         )
-        self._shell = self._ssh.invoke_shell()
+        self._shell = self._ssh.invoke_shell(term='vt100', width=200, height=200)
         self._shell.settimeout(_remaining_time())
         self._recv()
 
@@ -230,7 +237,7 @@ class SSHHandler(ConnectionHandler):
 
     def send(self, command, expect):
         self._shell.settimeout(_remaining_time())
-        LOG.debug('Entering send')
+        LOG.debug('Entering send: (%s, %s)', command, expect)
 
         if not command and not expect:
             raise ValueError("Expect and command cannot both be NoneType.")
@@ -238,38 +245,79 @@ class SSHHandler(ConnectionHandler):
         if command:
             self._shell.send(command + "\n")
         else:
-            output = self._recv(expect, True)
-            return output
+            return self._recv(expect, True)
 
         output = None
 
         if expect:
             output = self._recv(expect)
 
+            output = output.replace('\\n', '\n').replace('\r', '').replace('\\r', '')
             LOG.debug('Output: %s', output)
-            output = output.replace('\\n', '\n').replace('\\r', '')
 
         return output
 
     def _recv(self, expect=None, continue_return=False):
+        LOG.debug("  receiving (%s, %s)", expect, continue_return)
         return_val = ''
 
-        while not self._shell.recv_ready() and _check_timer():
+        while not self._shell.recv_ready() and not self._shell.recv_stderr_ready() and _check_timer():
+            LOG.debug("  waiting for shell to be ready...")
             if continue_return:
+                LOG.debug("    sending newline")
                 self._shell.send("\n")
+            LOG.debug("    sleeping for %s", SLEEP_TIMER)
             time.sleep(SLEEP_TIMER)
 
+        # If we have an error, return it
+        # Note that since this is an error, we ignore the timeout timer when
+        # trying to get the error message
+        if self._shell.recv_stderr_ready():
+            LOG.debug("Command encountered error")
+            # Note: an excellent place for Python 3.8's "walrus" operator here
+            error = 'notblank'
+            while error != '':
+                LOG.debug("  receiving 1024 characters from shell")
+                error = self._shell.recv_stderr(1024)
+                LOG.debug("  received %s bytes", len(error))
+                if isinstance(error, bytes):
+                    try:
+                        error = error.decode('utf-8')
+                    except UnicodeDecodeError:
+                        error = str(error, errors='ignore')
+                LOG.debug("  error from shell.recv_stderr(): %s", error)
+                return_val += error if error else ''
+            return return_val
+
+        # While we still haven't timed out, keep checking for and grabbing
+        # output from the command and comparing it to the expect
+        # Break once we have what we expect, otherwise keep waiting until
+        # timeout
         while _check_timer():
+            # Double check that the command has output available for us
             if not self._shell.recv_ready():
+                LOG.debug("  shell not ready, sleeping %s", SLEEP_TIMER)
                 time.sleep(SLEEP_TIMER)
                 continue
-            output = unicode(self._shell.recv(1024), errors='ignore')
-            return_val += output if output else u''
+            LOG.debug("  receiving 1024 characters from shell")
+            output = self._shell.recv(1024)
+            LOG.debug("  received %s bytes", len(output))
+            if isinstance(output, bytes):
+                try:
+                    output = output.decode('utf-8')
+                except UnicodeDecodeError:
+                    output = str(output, errors='ignore')
+            LOG.debug("  output from shell.recv(): %s", output)
+            return_val += output if output else ''
 
+            LOG.debug("  expect: %s", expect)
+            LOG.debug("  return val: %s", return_val)
             if (expect and _expect_return(expect, return_val)) or not expect:
+                LOG.debug("    expect matched return value")
                 break
 
             if continue_return:
+                LOG.debug("  sending newline")
                 self._shell.send("\n")
 
         if not _check_timer():
