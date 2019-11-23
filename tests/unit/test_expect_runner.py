@@ -15,16 +15,15 @@
 # limitations under the License.
 
 import copy
-import json
 
 import mock
-import expect_runner.expect_runner
 
-from st2actions.container import service
 from st2common.constants.action import LIVEACTION_STATUS_SUCCEEDED, LIVEACTION_STATUS_FAILED
 from st2common.constants.action import LIVEACTION_STATUS_TIMED_OUT
 from st2tests.base import RunnerTestCase
 from st2tests.base import CleanDbTestCase
+
+from expect_runner import expect_runner
 
 RUNNER_PARAMETERS = dict(
     cmds=[
@@ -117,6 +116,7 @@ MOCK_BROKEN_GRAMMAR = "entry = {/.*/}"
 MockParimiko = mock.MagicMock()
 MockParimiko.SSHClient().invoke_shell().recv_ready.side_effect = \
     lambda: (MockParimiko.SSHClient().invoke_shell().recv_ready.call_count % 2) == 0
+MockParimiko.SSHClient().invoke_shell().recv_stderr_ready.side_effect = mock.Mock(return_value=False)
 MockParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_OUTPUT
 
 
@@ -137,10 +137,10 @@ MockNoContentPackConfigLoader().get_config().return_value = None
     expect_runner.ContentPackConfigLoader,
     'get_config',
     mock.MagicMock(return_value=MOCK_CONFIG))
-@mock.patch('expect_runner.paramiko', MockParimiko)
-class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
-    register_packs = True
-    register_pack_configs = True
+@mock.patch('expect_runner.expect_runner.paramiko', MockParimiko)
+class ExpectRunnerTestCase(RunnerTestCase):
+    register_packs = False
+    register_pack_configs = False
 
     def test_runner_creation(self):
         runner = expect_runner.get_runner()
@@ -152,12 +152,10 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = MOCK_COMPLEX_GRAMMAR
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
 
-        output = json.loads(output)
-        mock_json_entries = json.loads(MOCK_JSON_ENTRIES)
+        mock_json_entries = MOCK_JSON_ENTRIES
 
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
@@ -167,7 +165,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         timeout = 0
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.container_service = service.RunnerContainerService()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['timeout'] = timeout
         runner.pre_run()
@@ -182,7 +179,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         timeout = 1
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
-        runner.container_service = service.RunnerContainerService()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['expects'] = EXPECT_NOT_IN_OUTPUT
         runner.runner_parameters['timeout'] = timeout
@@ -198,10 +194,8 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = RUNNER_PARAMETERS
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
-        output = json.loads(output)
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
         self.assertEqual(output['result'], MOCK_OUTPUT)
@@ -211,7 +205,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = MOCK_BROKEN_GRAMMAR
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         self.assertEqual(status, LIVEACTION_STATUS_FAILED)
@@ -223,10 +216,8 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = MULTIPLE_COMMANDS
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
-        output = json.loads(output)
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
         self.assertEqual(output['result'], MOCK_OUTPUT * 2)
@@ -235,7 +226,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = RUNNER_PARAMETERS
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
 
@@ -272,7 +262,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = BROKEN_COMMANDS
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         self.assertEqual(status, LIVEACTION_STATUS_FAILED)
@@ -290,12 +279,10 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = None
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
-        output = json.loads(output)
         self.assertEqual(output['result'], MOCK_OUTPUT)
 
     def test_none_expect(self):
@@ -303,13 +290,11 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = NONE_EXPECT
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         output = output
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
-        output = json.loads(output)
         self.assertEqual(output['result'], '')
 
     def test_none_cmd(self):
@@ -317,13 +302,11 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = NONE_COMMANDS
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         output = output
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
-        output = json.loads(output)
         self.assertEqual(output['result'], MOCK_OUTPUT)
 
     def test_none_cmd_expect(self):
@@ -331,7 +314,6 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = NONE_EXPECT_COMMANDS
-        runner.container_service = service.RunnerContainerService()
         runner.pre_run()
         (status, output, _) = runner.run(None)
         output = output
@@ -343,19 +325,18 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         MockUnicodeParimiko = mock.MagicMock()
         MockUnicodeParimiko.SSHClient().invoke_shell().recv_ready.side_effect = \
             lambda: (MockParimiko.SSHClient().invoke_shell().recv_ready.call_count % 2) == 0
+        MockUnicodeParimiko.SSHClient().invoke_shell().recv_stderr_ready.side_effect = mock.Mock(return_value=False)
         MockUnicodeParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_UNICODE_OUTPUT
 
-        with mock.patch('expect_runner.paramiko', MockUnicodeParimiko):
+        with mock.patch('expect_runner.expect_runner.paramiko', MockUnicodeParimiko):
             runner = expect_runner.get_runner()
             runner.action = self._get_mock_action_obj()
             runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
-            runner.container_service = service.RunnerContainerService()
             runner.pre_run()
             (status, output, _) = runner.run(None)
             output = output
             self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
             self.assertTrue(output is not None)
-            output = json.loads(output)
             self.assertEqual(
                 output['result'],
                 unicode(MOCK_UNICODE_OUTPUT, errors="ignore")
@@ -364,17 +345,15 @@ class ExpectRunnerTestCase(RunnerTestCase, CleanDbTestCase):
         MockUnicodeParimiko.SSHClient().invoke_shell().recv.return_value = \
             MOCK_UNICODE_OUTPUT_WITH_FAKE_BYTE
 
-        with mock.patch('expect_runner.paramiko', MockUnicodeParimiko):
+        with mock.patch('expect_runner.expect_runner.paramiko', MockUnicodeParimiko):
             runner = expect_runner.get_runner()
             runner.action = self._get_mock_action_obj()
             runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
-            runner.container_service = service.RunnerContainerService()
             runner.pre_run()
             (status, output, _) = runner.run(None)
             output = output
             self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
             self.assertTrue(output is not None)
-            output = json.loads(output)
             self.assertEqual(
                 output['result'],
                 unicode(MOCK_UNICODE_OUTPUT, errors="ignore")
