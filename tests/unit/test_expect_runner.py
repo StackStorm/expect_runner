@@ -138,6 +138,7 @@ MockNoContentPackConfigLoader().get_config().return_value = None
     'get_config',
     mock.MagicMock(return_value=MOCK_CONFIG))
 @mock.patch('expect_runner.expect_runner.paramiko', MockParimiko)
+@mock.patch('expect_runner.expect_runner.SLEEP_TIMER', 0.05)  # Decrease sleep to speed up tests
 class ExpectRunnerTestCase(RunnerTestCase):
     register_packs = False
     register_pack_configs = False
