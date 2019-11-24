@@ -82,7 +82,8 @@ class ExpectRunner(ActionRunner):
         output = ''
 
         if not isinstance(cmds, list):
-            raise ValueError("Expected list, got %s which is of type %s" % (cmds, type(cmds)))
+            raise ValueError("Expected list, got %s which is of type %s" % (cmds,
+                                                                            type(cmds).__name__))
 
         for cmd_tuple in cmds:
             LOG.debug("expect runner cmds: %s", cmd_tuple)

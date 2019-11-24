@@ -16,6 +16,7 @@
 import json
 import copy
 
+import six
 import mock
 
 from st2common.constants.action import LIVEACTION_STATUS_SUCCEEDED, LIVEACTION_STATUS_FAILED
@@ -102,7 +103,10 @@ MOCK_UNICODE_OUTPUT_STR = (
     """
 )
 
-MOCK_UNICODE_OUTPUT = MOCK_UNICODE_OUTPUT_STR.decode('utf-8')
+if six.PY2:
+    MOCK_UNICODE_OUTPUT = MOCK_UNICODE_OUTPUT_STR.decode('utf-8')
+else:
+    MOCK_UNICODE_OUTPUT = MOCK_UNICODE_OUTPUT_STR
 
 MOCK_UNICODE_OUTPUT_WITH_FAKE_BYTE = MOCK_UNICODE_OUTPUT_STR + chr(255)
 
@@ -271,7 +275,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertEqual(status, LIVEACTION_STATUS_FAILED)
         self.assertEqual(
             output['error'],
-            "Expected list, got %s which is of type <type 'str'>" % (BROKEN_COMMANDS)
+            "Expected list, got %s which is of type str" % (BROKEN_COMMANDS)
         )
 
     @mock.patch.object(
@@ -356,4 +360,8 @@ class ExpectRunnerTestCase(RunnerTestCase):
             output = output
             self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
             self.assertTrue(output is not None)
-            self.assertEqual(output['result'], MOCK_UNICODE_OUTPUT)
+
+            if six.PY2:
+                self.assertEqual(output['result'], MOCK_UNICODE_OUTPUT)
+            else:
+                self.assertEqual(output['result'], MOCK_UNICODE_OUTPUT_WITH_FAKE_BYTE)
