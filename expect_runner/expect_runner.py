@@ -1,9 +1,8 @@
-# Licensed to the StackStorm, Inc ('StackStorm') under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.
-# The ASF licenses this file to You under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
+# Copyright 2019 Extreme Networks, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -18,11 +17,12 @@ import time
 import socket
 import re
 import json
-import grako
 
+import tatsu
 import paramiko
 
 from st2common.runners.base import ActionRunner
+from st2common.runners.base import get_metadata as get_runner_metadata
 from st2common import log as logging
 from st2common.util.config_loader import ContentPackConfigLoader
 from st2common.constants.action import LIVEACTION_STATUS_SUCCEEDED
@@ -66,21 +66,27 @@ def get_runner():
     return ExpectRunner(str(uuid.uuid4()))
 
 
+def get_metadata():
+    return get_runner_metadata('expect_runner')[0]
+
+
 class ExpectRunner(ActionRunner):
-    def _parse_grako(self, output):
-        parser = grako.genmodel("output_parser", self._grammar)
-        parsed_output = parser.parse(output, self._entry)
+    def _parse(self, output):
+        model = tatsu.compile(self._grammar)
+        parsed_output = model.parse(output, start=self._entry)
         LOG.info('Parsed output: %s', parsed_output)
 
         return parsed_output
 
     def _get_shell_output(self, cmds, default_expect):
-        output = u''
+        output = ''
 
         if not isinstance(cmds, list):
-            raise ValueError("Expected list, got %s which is of type %s" % (cmds, type(cmds)))
+            raise ValueError("Expected list, got %s which is of type %s" % (cmds,
+                                                                            type(cmds).__name__))
 
         for cmd_tuple in cmds:
+            LOG.debug("expect runner cmds: %s", cmd_tuple)
             if isinstance(cmd_tuple, list) and len(cmd_tuple) == 2:
                 cmd = cmd_tuple.pop(0)
                 expect = cmd_tuple.pop(0)
@@ -98,7 +104,7 @@ class ExpectRunner(ActionRunner):
 
             result = self._shell.send(cmd, expect)
 
-            output += result if result else u''
+            output += result if result else ''
 
         return output
 
@@ -169,16 +175,27 @@ class ExpectRunner(ActionRunner):
                 self._config['init_cmds'],
                 self._config['default_expect']
             )
+            LOG.debug("initial shell output: %s", init_output)
             output = self._get_shell_output(self._cmds, self._config['default_expect'])
+            LOG.debug("shell output: %s", output)
             self._close_shell()
 
             if self._grammar and len(output) > 0:
-                parsed_output = self._parse_grako(output)
-                result = json.dumps({'result': parsed_output,
-                                     'init_output': init_output})
+                parsed_output = self._parse(output)
+                # NOTE: We dump result to json and back so we only get back simple types.
+                # tatsu.parse by default returns "complex" types which are not directly
+                # serializable
+                parsed_output = json.dumps(parsed_output)
+                parsed_output = json.loads(parsed_output)
+                result = {
+                    'result': parsed_output,
+                    'init_output': init_output,
+                }
             else:
-                result = json.dumps({'result': output,
-                                     'init_output': init_output})
+                result = {
+                    'result': output,
+                    'init_output': init_output,
+                }
 
             result_status = LIVEACTION_STATUS_SUCCEEDED
 
@@ -216,7 +233,7 @@ class SSHHandler(ConnectionHandler):
             password=password,
             timeout=timeout
         )
-        self._shell = self._ssh.invoke_shell()
+        self._shell = self._ssh.invoke_shell(term='vt100', width=200, height=200)
         self._shell.settimeout(_remaining_time())
         self._recv()
 
@@ -225,7 +242,7 @@ class SSHHandler(ConnectionHandler):
 
     def send(self, command, expect):
         self._shell.settimeout(_remaining_time())
-        LOG.debug('Entering send')
+        LOG.debug('Entering send: (%s, %s)', command, expect)
 
         if not command and not expect:
             raise ValueError("Expect and command cannot both be NoneType.")
@@ -233,43 +250,86 @@ class SSHHandler(ConnectionHandler):
         if command:
             self._shell.send(command + "\n")
         else:
-            output = self._recv(expect, True)
-            return output
+            return self._recv(expect, True)
 
         output = None
 
         if expect:
             output = self._recv(expect)
 
+            output = output.replace('\\n', '\n').replace('\r', '').replace('\\r', '')
             LOG.debug('Output: %s', output)
-            output = output.replace('\\n', '\n').replace('\\r', '')
 
         return output
 
     def _recv(self, expect=None, continue_return=False):
+        LOG.debug("  receiving (%s, %s)", expect, continue_return)
         return_val = ''
 
-        while not self._shell.recv_ready() and _check_timer():
+        while not self._shell.recv_ready() and not self._shell.recv_stderr_ready() and \
+                _check_timer():
+            LOG.debug("  waiting for shell to be ready...")
             if continue_return:
+                LOG.debug("    sending newline")
                 self._shell.send("\n")
+            LOG.debug("    sleeping for %s", SLEEP_TIMER)
             time.sleep(SLEEP_TIMER)
 
+        # If we have an error, return it
+        # Note that since this is an error, we ignore the timeout timer when
+        # trying to get the error message
+        if self._shell.recv_stderr_ready():
+            LOG.debug("Command encountered error")
+            # Note: an excellent place for Python 3.8's "walrus" operator here
+            error = 'notblank'
+            while error != '':
+                LOG.debug("  receiving 1024 characters from shell")
+                error = self._shell.recv_stderr(1024)
+                LOG.debug("  received %s bytes", len(error))
+                if isinstance(error, bytes):
+                    try:
+                        error = error.decode('utf-8')
+                    except UnicodeDecodeError:
+                        error = error.decode("utf-8", errors='ignore')
+                LOG.debug("  error from shell.recv_stderr(): %s", error)
+                return_val += error if error else ''
+            return return_val
+
+        # While we still haven't timed out, keep checking for and grabbing
+        # output from the command and comparing it to the expect
+        # Break once we have what we expect, otherwise keep waiting until
+        # timeout
         while _check_timer():
+            # Double check that the command has output available for us
             if not self._shell.recv_ready():
+                LOG.debug("  shell not ready, sleeping %s", SLEEP_TIMER)
                 time.sleep(SLEEP_TIMER)
                 continue
-            output = unicode(self._shell.recv(1024), errors='ignore')
-            return_val += output if output else u''
+            LOG.debug("  receiving 1024 characters from shell")
+            output = self._shell.recv(1024)
+            LOG.debug("  received %s bytes", len(output))
+            if isinstance(output, bytes):
+                try:
+                    output = output.decode('utf-8')
+                except UnicodeDecodeError:
+                    output = output.decode("utf-8", errors='ignore')
+            LOG.debug("  output from shell.recv(): %s", output)
+            return_val += output if output else ''
 
+            LOG.debug("  expect: %s", expect)
+            LOG.debug("  return val: %s", return_val)
             if (expect and _expect_return(expect, return_val)) or not expect:
+                LOG.debug("    expect matched return value")
                 break
 
             if continue_return:
+                LOG.debug("  sending newline")
                 self._shell.send("\n")
 
         if not _check_timer():
             raise TimeoutError("Reached timeout (%s seconds). Recieved: %s" % (TIMEOUT, return_val))
 
         return return_val
+
 
 HANDLERS['ssh'] = SSHHandler
