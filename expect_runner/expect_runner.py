@@ -16,8 +16,10 @@ import uuid
 import time
 import socket
 import re
-import tatsu
+import json
 
+import six
+import tatsu
 import paramiko
 
 from st2common.runners.base import ActionRunner
@@ -180,6 +182,11 @@ class ExpectRunner(ActionRunner):
 
             if self._grammar and len(output) > 0:
                 parsed_output = self._parse(output)
+                # NOTE: We dump result to json and back so we only get back simple types.
+                # tatsu.parse by default returns "complex" types which are not directly
+                # serializable
+                parsed_output = json.dumps(parsed_output)
+                parsed_output = json.loads(parsed_output)
                 result = {
                     'result': parsed_output,
                     'init_output': init_output,
