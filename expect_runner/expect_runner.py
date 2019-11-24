@@ -1,9 +1,8 @@
-# Licensed to the StackStorm, Inc ('StackStorm') under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.
-# The ASF licenses this file to You under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
+# Copyright 2019 Extreme Networks, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -18,8 +17,8 @@ import time
 import socket
 import re
 import json
-import tatsu
 
+import tatsu
 import paramiko
 
 from st2common.runners.base import ActionRunner
@@ -83,7 +82,8 @@ class ExpectRunner(ActionRunner):
         output = ''
 
         if not isinstance(cmds, list):
-            raise ValueError("Expected list, got %s which is of type %s" % (cmds, type(cmds)))
+            raise ValueError("Expected list, got %s which is of type %s" % (cmds,
+                                                                            type(cmds).__name__))
 
         for cmd_tuple in cmds:
             LOG.debug("expect runner cmds: %s", cmd_tuple)
@@ -175,13 +175,18 @@ class ExpectRunner(ActionRunner):
                 self._config['init_cmds'],
                 self._config['default_expect']
             )
-            LOG.debug("initial shell output: %s", output)
+            LOG.debug("initial shell output: %s", init_output)
             output = self._get_shell_output(self._cmds, self._config['default_expect'])
             LOG.debug("shell output: %s", output)
             self._close_shell()
 
             if self._grammar and len(output) > 0:
                 parsed_output = self._parse(output)
+                # NOTE: We dump result to json and back so we only get back simple types.
+                # tatsu.parse by default returns "complex" types which are not directly
+                # serializable
+                parsed_output = json.dumps(parsed_output)
+                parsed_output = json.loads(parsed_output)
                 result = {
                     'result': parsed_output,
                     'init_output': init_output,
@@ -261,7 +266,8 @@ class SSHHandler(ConnectionHandler):
         LOG.debug("  receiving (%s, %s)", expect, continue_return)
         return_val = ''
 
-        while not self._shell.recv_ready() and not self._shell.recv_stderr_ready() and _check_timer():
+        while not self._shell.recv_ready() and not self._shell.recv_stderr_ready() and \
+                _check_timer():
             LOG.debug("  waiting for shell to be ready...")
             if continue_return:
                 LOG.debug("    sending newline")
@@ -284,7 +290,7 @@ class SSHHandler(ConnectionHandler):
                     try:
                         error = error.decode('utf-8')
                     except UnicodeDecodeError:
-                        error = str(error, errors='ignore')
+                        error = error.decode("utf-8", errors='ignore')
                 LOG.debug("  error from shell.recv_stderr(): %s", error)
                 return_val += error if error else ''
             return return_val
@@ -306,7 +312,7 @@ class SSHHandler(ConnectionHandler):
                 try:
                     output = output.decode('utf-8')
                 except UnicodeDecodeError:
-                    output = str(output, errors='ignore')
+                    output = output.decode("utf-8", errors='ignore')
             LOG.debug("  output from shell.recv(): %s", output)
             return_val += output if output else ''
 
@@ -324,5 +330,6 @@ class SSHHandler(ConnectionHandler):
             raise TimeoutError("Reached timeout (%s seconds). Recieved: %s" % (TIMEOUT, return_val))
 
         return return_val
+
 
 HANDLERS['ssh'] = SSHHandler
