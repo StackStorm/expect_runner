@@ -18,7 +18,6 @@ import socket
 import re
 import json
 
-import six
 import tatsu
 import paramiko
 
@@ -290,7 +289,7 @@ class SSHHandler(ConnectionHandler):
                     try:
                         error = error.decode('utf-8')
                     except UnicodeDecodeError:
-                        error = str(error, errors='ignore')
+                        error = error.decode("utf-8", errors='ignore')
                 LOG.debug("  error from shell.recv_stderr(): %s", error)
                 return_val += error if error else ''
             return return_val
@@ -312,7 +311,7 @@ class SSHHandler(ConnectionHandler):
                 try:
                     output = output.decode('utf-8')
                 except UnicodeDecodeError:
-                    output = str(output, errors='ignore')
+                    output = output.decode("utf-8", errors='ignore')
             LOG.debug("  output from shell.recv(): %s", output)
             return_val += output if output else ''
 

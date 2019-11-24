@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2019 Extreme Networks, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import copy
 
 import mock
@@ -83,7 +85,7 @@ MOCK_OUTPUT = """This is example output of a shell. It contains entries one
     SSH@MyHappyShell#
     """
 
-MOCK_UNICODE_OUTPUT = (
+MOCK_UNICODE_OUTPUT_STR = (
     """
     This is example output of a shell. It contains entries one
     can parse and also this text that you can choose to ignore. The list is
@@ -100,7 +102,9 @@ MOCK_UNICODE_OUTPUT = (
     """
 )
 
-MOCK_UNICODE_OUTPUT_WITH_FAKE_BYTE = MOCK_UNICODE_OUTPUT + chr(255)
+MOCK_UNICODE_OUTPUT = MOCK_UNICODE_OUTPUT_STR.decode('utf-8')
+
+MOCK_UNICODE_OUTPUT_WITH_FAKE_BYTE = MOCK_UNICODE_OUTPUT_STR + chr(255)
 
 MOCK_JSON_ENTRIES = """{"entries": [{"name": ["George", "Clooney"],
 "birthday_month": "Januaray", "age": "21"}, {"name": ["Emma", "Stone"],
@@ -131,7 +135,6 @@ MockNoContentPackConfigLoader = mock.MagicMock()
 MockNoContentPackConfigLoader().get_config().return_value = None
 
 
-# @mock.patch('expect_runner.ContentPackConfigLoader', MockContentPackConfigLoader)
 @mock.patch.object(
     expect_runner.ContentPackConfigLoader,
     'get_config',
@@ -139,6 +142,8 @@ MockNoContentPackConfigLoader().get_config().return_value = None
 @mock.patch('expect_runner.expect_runner.paramiko', MockParimiko)
 @mock.patch('expect_runner.expect_runner.SLEEP_TIMER', 0.05)  # Decrease sleep to speed up tests
 class ExpectRunnerTestCase(RunnerTestCase):
+    maxDiff = None
+
     def test_runner_creation(self):
         runner = expect_runner.get_runner()
         self.assertTrue(runner is not None, 'Creation failed. No instance.')
@@ -152,12 +157,13 @@ class ExpectRunnerTestCase(RunnerTestCase):
         runner.pre_run()
         (status, output, _) = runner.run(None)
 
-        mock_json_entries = MOCK_JSON_ENTRIES
+        mock_json_entries = json.loads(MOCK_JSON_ENTRIES)
 
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
         self.assertEqual(output['result'], mock_json_entries)
 
+    @mock.patch('expect_runner.expect_runner.SLEEP_TIMER', 1)
     def test_expect_timeout(self, *args):
         timeout = 0
         runner = expect_runner.get_runner()
@@ -172,8 +178,9 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertEqual(output['error'], 'Action failed to complete in 0 seconds')
         self.assertEqual(output['exit_code'], -9)
 
+    @mock.patch('expect_runner.expect_runner.SLEEP_TIMER', 1)
     def test_expect_timeout_on_expect_fail(self, *args):
-        timeout = 1
+        timeout = 0.01
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
@@ -184,7 +191,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertEqual(status, LIVEACTION_STATUS_TIMED_OUT)
         self.assertTrue(output is not None)
         self.assertEqual(output['result'], None)
-        self.assertEqual(output['error'], 'Action failed to complete in 1 seconds')
+        self.assertEqual(output['error'], 'Action failed to complete in 0.01 seconds')
         self.assertEqual(output['exit_code'], -9)
 
     def test_expect_succeeded(self):
@@ -335,10 +342,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
             output = output
             self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
             self.assertTrue(output is not None)
-            self.assertEqual(
-                output['result'],
-                unicode(MOCK_UNICODE_OUTPUT, errors="ignore")
-            )
+            self.assertEqual(output['result'], MOCK_UNICODE_OUTPUT)
 
         MockUnicodeParimiko.SSHClient().invoke_shell().recv.return_value = \
             MOCK_UNICODE_OUTPUT_WITH_FAKE_BYTE
@@ -352,7 +356,4 @@ class ExpectRunnerTestCase(RunnerTestCase):
             output = output
             self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
             self.assertTrue(output is not None)
-            self.assertEqual(
-                output['result'],
-                unicode(MOCK_UNICODE_OUTPUT, errors="ignore")
-            )
+            self.assertEqual(output['result'], MOCK_UNICODE_OUTPUT)
