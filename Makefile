@@ -86,14 +86,8 @@ pylint: requirements .clone_st2_repo .pylint
 .PHONY: compile
 compile:
 	@echo "======================= compile ========================"
-	@echo "------- Compile all .py files (syntax check test - Python 2) ------"
+	@echo "------- Compile all .py files (syntax check test) ------"
 	@if python -c 'import compileall,re; compileall.compile_dir(".", rx=re.compile(r"/virtualenv|virtualenv-osx|virtualenv-py3|.tox|.git|.venv-st2devbox"), quiet=True)' | grep .; then exit 1; else exit 0; fi
-
-.PHONY: compilepy3
-compilepy3:
-	@echo "======================= compile ========================"
-	@echo "------- Compile all .py files (syntax check test - Python 3) ------"
-	@if python3 -c 'import compileall,re; compileall.compile_dir(".", rx=re.compile(r"/virtualenv|virtualenv-osx|virtualenv-py3|.tox|.git|.venv-st2devbox|./st2tests/st2tests/fixtures/packs/test"), quiet=True)' | grep .; then exit 1; else exit 0; fi
 
 .PHONY: .flake8
 .flake8:
