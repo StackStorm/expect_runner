@@ -1,9 +1,8 @@
-# Licensed to the StackStorm, Inc ('StackStorm') under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.
-# The ASF licenses this file to You under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
+# Copyright 2019 Extreme Networks, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -17,7 +16,6 @@ import uuid
 import time
 import socket
 import re
-import json
 import tatsu
 
 import paramiko
@@ -261,7 +259,8 @@ class SSHHandler(ConnectionHandler):
         LOG.debug("  receiving (%s, %s)", expect, continue_return)
         return_val = ''
 
-        while not self._shell.recv_ready() and not self._shell.recv_stderr_ready() and _check_timer():
+        while not self._shell.recv_ready() and not self._shell.recv_stderr_ready() and \
+                _check_timer():
             LOG.debug("  waiting for shell to be ready...")
             if continue_return:
                 LOG.debug("    sending newline")
@@ -324,5 +323,6 @@ class SSHHandler(ConnectionHandler):
             raise TimeoutError("Reached timeout (%s seconds). Recieved: %s" % (TIMEOUT, return_val))
 
         return return_val
+
 
 HANDLERS['ssh'] = SSHHandler

@@ -1,10 +1,8 @@
-# -*- coding: utf-8 -*-
-# Licensed to the StackStorm, Inc ('StackStorm') under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.
-# The ASF licenses this file to You under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
+# Copyright 2019 Extreme Networks, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -21,9 +19,9 @@ import mock
 from st2common.constants.action import LIVEACTION_STATUS_SUCCEEDED, LIVEACTION_STATUS_FAILED
 from st2common.constants.action import LIVEACTION_STATUS_TIMED_OUT
 from st2tests.base import RunnerTestCase
-from st2tests.base import CleanDbTestCase
 
 from expect_runner import expect_runner
+
 
 RUNNER_PARAMETERS = dict(
     cmds=[
@@ -62,7 +60,7 @@ EXPECT_NOT_IN_OUTPUT = [
 
 BROKEN_COMMANDS = "very bad command that isn't a list"
 
-MOCK_COMPLEX_GRAMMAR = """@@whitespace :: /[\t ]+/
+MOCK_COMPLEX_GRAMMAR = r"""@@whitespace :: /[\t ]+/
 number = /[0-9]+/;
 string = ?/[a-zA-Z0-9\-\_\=\.\:'\/\+]+/?;
 name = (string string);
@@ -116,7 +114,8 @@ MOCK_BROKEN_GRAMMAR = "entry = {/.*/}"
 MockParimiko = mock.MagicMock()
 MockParimiko.SSHClient().invoke_shell().recv_ready.side_effect = \
     lambda: (MockParimiko.SSHClient().invoke_shell().recv_ready.call_count % 2) == 0
-MockParimiko.SSHClient().invoke_shell().recv_stderr_ready.side_effect = mock.Mock(return_value=False)
+MockParimiko.SSHClient().invoke_shell().recv_stderr_ready.side_effect = \
+    mock.Mock(return_value=False)
 MockParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_OUTPUT
 
 
@@ -140,9 +139,6 @@ MockNoContentPackConfigLoader().get_config().return_value = None
 @mock.patch('expect_runner.expect_runner.paramiko', MockParimiko)
 @mock.patch('expect_runner.expect_runner.SLEEP_TIMER', 0.05)  # Decrease sleep to speed up tests
 class ExpectRunnerTestCase(RunnerTestCase):
-    register_packs = False
-    register_pack_configs = False
-
     def test_runner_creation(self):
         runner = expect_runner.get_runner()
         self.assertTrue(runner is not None, 'Creation failed. No instance.')
@@ -326,7 +322,8 @@ class ExpectRunnerTestCase(RunnerTestCase):
         MockUnicodeParimiko = mock.MagicMock()
         MockUnicodeParimiko.SSHClient().invoke_shell().recv_ready.side_effect = \
             lambda: (MockParimiko.SSHClient().invoke_shell().recv_ready.call_count % 2) == 0
-        MockUnicodeParimiko.SSHClient().invoke_shell().recv_stderr_ready.side_effect = mock.Mock(return_value=False)
+        MockUnicodeParimiko.SSHClient().invoke_shell().recv_stderr_ready.side_effect = \
+            mock.Mock(return_value=False)
         MockUnicodeParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_UNICODE_OUTPUT
 
         with mock.patch('expect_runner.expect_runner.paramiko', MockUnicodeParimiko):
