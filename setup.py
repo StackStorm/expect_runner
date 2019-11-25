@@ -22,7 +22,7 @@ from setuptools import find_packages
 from dist_utils import fetch_requirements
 from dist_utils import apply_vagrant_workaround
 
-from http_runner import __version__
+from expect_runner import __version__
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 REQUIREMENTS_FILE = os.path.join(BASE_DIR, 'requirements.txt')
