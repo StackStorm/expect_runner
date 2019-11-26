@@ -23,6 +23,7 @@
       items:
         oneOf:
           - type: string
+          - type: array
           - type: object
     expects:
       description: List of expects that match with cmds.
