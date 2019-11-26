@@ -45,6 +45,10 @@ MULTIPLE_COMMANDS = [
     ['two happy commands', '#']
 ]
 
+MULTIPLE_COMMANDS_DICT_ITEMS = [
+    {'cmd': 'one happy command'},
+    {'cmd': 'two happy command', 'expect': '#'},
+]
 NONE_EXPECT = [
     ['one happy command', None]
 ]
@@ -219,11 +223,22 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertTrue(output is not None)
         self.assertEqual(output['result'], None)
 
-    def test_multiple_cmds(self):
+    def test_multiple_cmds_as_array_of_arays(self):
         runner = expect_runner.get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = MULTIPLE_COMMANDS
+        runner.pre_run()
+        (status, output, _) = runner.run(None)
+        self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
+        self.assertTrue(output is not None)
+        self.assertEqual(output['result'], MOCK_OUTPUT * 2)
+
+    def test_multiple_cmds_as_array_of_dicts(self):
+        runner = expect_runner.get_runner()
+        runner.action = self._get_mock_action_obj()
+        runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
+        runner.runner_parameters['cmds'] = MULTIPLE_COMMANDS_DICT_ITEMS
         runner.pre_run()
         (status, output, _) = runner.run(None)
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
