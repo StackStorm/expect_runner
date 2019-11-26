@@ -25,6 +25,16 @@
           - type: string
           - type: array
           - type: object
+            properties:
+              cmd:
+                type: string
+                description: Command to run.
+                required: true
+              expect:
+                type: string
+                description: String to expect / wait on
+                required: false
+            additionalProperties: false
     expects:
       description: List of expects that match with cmds.
       type: array
