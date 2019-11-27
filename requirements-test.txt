@@ -8,3 +8,4 @@ unittest2
 rednose
 nose-timer==0.7.5
 psutil==5.6.3
+codecov==2.0.15
