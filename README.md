@@ -2,6 +2,8 @@
 
 This repository contains StackStorm runner which is based around the ``expect`` Linux tool.
 
+[![Build Status](https://circleci.com/gh/StackStorm/stackstorm-runner-expect/tree/master.svg?style=shield)](https://circleci.com/gh/StackStorm/stackstorm-runner-expect) [![Codecov](https://codecov.io/github/StackStorm/stackstorm-runner-expect/badge.svg?branch=master&service=github)](https://codecov.io/github/StackStorm/stackstorm-runner-expect?branch=master) 
+
 ## Installation
 
 ```bash
