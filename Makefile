@@ -124,8 +124,8 @@ compile:
 	@echo
 	rm -f .coverage
 	rm -f coverage.xml
-	virtualenv/bin/coverage xml --rcfile=./lint-configs/.coveragerc -i -o coverage.xml
 	. $(VIRTUALENV_DIR)/bin/activate; nosetests --with-cover --cover-erase --cover-tests --cover-package=expect_runner,tests $(NOSE_OPTS) -s -v tests/unit/
+	virtualenv/bin/coverage xml --rcfile=./lint-configs/.coveragerc -i -o coverage.xml
 	virtualenv/bin/codecov --file coverage.xml
 
 .PHONY: .clone_st2_repo
