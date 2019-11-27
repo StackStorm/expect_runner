@@ -24,7 +24,6 @@ import paramiko
 from st2common.runners.base import ActionRunner
 from st2common.runners.base import get_metadata as get_runner_metadata
 from st2common import log as logging
-from st2common.util.config_loader import ContentPackConfigLoader
 from st2common.constants.action import LIVEACTION_STATUS_SUCCEEDED
 from st2common.constants.action import LIVEACTION_STATUS_FAILED
 from st2common.constants.action import LIVEACTION_STATUS_TIMED_OUT
@@ -62,8 +61,8 @@ def _expect_return(expect, output):
     return re.search(expect, output) is not None
 
 
-def get_runner():
-    return ExpectRunner(str(uuid.uuid4()))
+def get_runner(config=None):
+    return ExpectRunner(str(uuid.uuid4()), config=config)
 
 
 def get_metadata():
@@ -71,6 +70,11 @@ def get_metadata():
 
 
 class ExpectRunner(ActionRunner):
+    def __init__(self, runner_id, config=None):
+        super(ExpectRunner, self).__init__(runner_id=runner_id)
+
+        self._config = config or {}
+
     def _parse(self, output):
         model = tatsu.compile(self._grammar)
         parsed_output = model.parse(output, start=self._entry)
@@ -122,25 +126,6 @@ class ExpectRunner(ActionRunner):
             'Entering ExpectRunner.PRE_run() for liveaction_id="%s"',
             self.liveaction_id
         )
-
-        self._config = {
-            'init_cmds': [],
-            'default_expect': None
-        }
-
-        pack = self.get_pack_name()
-        user = self.get_user()
-
-        LOG.debug("Parsing config: %s, %s", pack, user)
-        config_loader = ContentPackConfigLoader(pack_name=pack, user=user)
-        config = config_loader.get_config()
-
-        if config:
-            LOG.debug("Loading pack config.")
-            self._config['init_cmds'] = config.get('init_cmds', [])
-            self._config['default_expect'] = config.get('default_expect', None)
-        else:
-            LOG.debug("No pack config found.")
 
         LOG.debug("Config: %s", self._config)
 
