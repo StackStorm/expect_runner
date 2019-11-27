@@ -96,8 +96,11 @@ class ExpectRunner(ActionRunner):
             elif isinstance(cmd_tuple, str):
                 cmd = cmd_tuple
                 expect = default_expect
+            elif isinstance(cmd_tuple, dict):
+                cmd = cmd_tuple['cmd']
+                expect = cmd_tuple.get('expect', default_expect)
             else:
-                raise ValueError("Command error. Entry wasn't proper type (list or string)"
+                raise ValueError("Command error. Entry wasn't proper type (list, dict or string)"
                                  " or list was of incorrect length. %s" % (cmd_tuple))
 
             LOG.debug("Dispatching command: %s, %s", cmd, expect)

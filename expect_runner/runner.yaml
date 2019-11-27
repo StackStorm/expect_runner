@@ -11,6 +11,30 @@
     cmds:
       description: List of commands to execute.
       type: array
+      # Items can either be arrays with two items where the first item is a command to execute
+      # and the second one is the expect command. For example:
+      # - ['show wireless ap configured', 'VX9000']
+      #
+      # Or an array where items are dictionaries / objects with two keys - "cmd" and "expect".
+      # For example:
+      # -
+      #   cmd: show wireless ap configured
+      #   expect: VX9000
+      items:
+        oneOf:
+          - type: string
+          - type: array
+          - type: object
+            properties:
+              cmd:
+                type: string
+                description: Command to run.
+                required: true
+              expect:
+                type: string
+                description: String to expect / wait on
+                required: false
+            additionalProperties: false
     expects:
       description: List of expects that match with cmds.
       type: array
