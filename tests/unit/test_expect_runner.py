@@ -136,29 +136,25 @@ MOCK_CONFIG = {
     'default_expect': '#'
 }
 
-MockContentPackConfigLoader = mock.MagicMock()
-MockContentPackConfigLoader().get_config().return_value = MOCK_CONFIG
 
-MockNoContentPackConfigLoader = mock.MagicMock()
-MockNoContentPackConfigLoader().get_config().return_value = None
+def get_runner(config=None):
+    config = config or MOCK_CONFIG
+    runner = expect_runner.get_runner(config=config)
+    return runner
 
 
-@mock.patch.object(
-    expect_runner.ContentPackConfigLoader,
-    'get_config',
-    mock.MagicMock(return_value=MOCK_CONFIG))
 @mock.patch('expect_runner.expect_runner.paramiko', MockParimiko)
 @mock.patch('expect_runner.expect_runner.SLEEP_TIMER', 0.05)  # Decrease sleep to speed up tests
 class ExpectRunnerTestCase(RunnerTestCase):
     maxDiff = None
 
     def test_runner_creation(self):
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         self.assertTrue(runner is not None, 'Creation failed. No instance.')
         self.assertEqual(type(runner), expect_runner.ExpectRunner, 'Creation failed. No instance.')
 
     def test_grako_parser(self):
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = MOCK_COMPLEX_GRAMMAR
@@ -174,7 +170,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
     @mock.patch('expect_runner.expect_runner.SLEEP_TIMER', 1)
     def test_expect_timeout(self, *args):
         timeout = 0
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['timeout'] = timeout
@@ -189,7 +185,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
     @mock.patch('expect_runner.expect_runner.SLEEP_TIMER', 1)
     def test_expect_timeout_on_expect_fail(self, *args):
         timeout = 0.01
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['expects'] = EXPECT_NOT_IN_OUTPUT
@@ -203,7 +199,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertEqual(output['exit_code'], -9)
 
     def test_expect_succeeded(self):
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = RUNNER_PARAMETERS
         runner.pre_run()
@@ -213,7 +209,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertEqual(output['result'], MOCK_OUTPUT)
 
     def test_expect_failed(self):
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = MOCK_BROKEN_GRAMMAR
@@ -224,7 +220,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertEqual(output['result'], None)
 
     def test_multiple_cmds_as_array_of_arays(self):
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = MULTIPLE_COMMANDS
@@ -235,7 +231,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertEqual(output['result'], MOCK_OUTPUT * 2)
 
     def test_multiple_cmds_as_array_of_dicts(self):
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = MULTIPLE_COMMANDS_DICT_ITEMS
@@ -246,7 +242,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertEqual(output['result'], MOCK_OUTPUT * 2)
 
     def test_paramiko_interface(self):
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = RUNNER_PARAMETERS
         runner.pre_run()
@@ -281,7 +277,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
         return action
 
     def test_cmds_not_list(self):
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = BROKEN_COMMANDS
@@ -293,12 +289,9 @@ class ExpectRunnerTestCase(RunnerTestCase):
             "Expected list, got %s which is of type str" % (BROKEN_COMMANDS)
         )
 
-    @mock.patch.object(
-        expect_runner.ContentPackConfigLoader,
-        'get_config',
-        mock.MagicMock(return_value=None))
     def test_no_grammar_with_no_config(self):
-        runner = expect_runner.get_runner()
+        runner = expect_runner.get_runner(config=None)
+        self.assertEqual(runner._config, {'init_cmds': [], 'default_expect': None})
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['grammar'] = None
@@ -306,10 +299,10 @@ class ExpectRunnerTestCase(RunnerTestCase):
         (status, output, _) = runner.run(None)
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
-        self.assertEqual(output['result'], MOCK_OUTPUT)
+        self.assertEqual(output['result'], '')
 
     def test_none_expect(self):
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = NONE_EXPECT
@@ -321,7 +314,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertEqual(output['result'], '')
 
     def test_none_cmd(self):
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = NONE_COMMANDS
@@ -333,7 +326,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertEqual(output['result'], MOCK_OUTPUT)
 
     def test_none_cmd_expect(self):
-        runner = expect_runner.get_runner()
+        runner = get_runner()
         runner.action = self._get_mock_action_obj()
         runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
         runner.runner_parameters['cmds'] = NONE_EXPECT_COMMANDS
@@ -353,7 +346,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
         MockUnicodeParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_UNICODE_OUTPUT
 
         with mock.patch('expect_runner.expect_runner.paramiko', MockUnicodeParimiko):
-            runner = expect_runner.get_runner()
+            runner = get_runner()
             runner.action = self._get_mock_action_obj()
             runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
             runner.pre_run()
@@ -367,7 +360,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
             MOCK_UNICODE_OUTPUT_WITH_FAKE_BYTE
 
         with mock.patch('expect_runner.expect_runner.paramiko', MockUnicodeParimiko):
-            runner = expect_runner.get_runner()
+            runner = get_runner()
             runner.action = self._get_mock_action_obj()
             runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
             runner.pre_run()

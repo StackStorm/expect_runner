@@ -17,6 +17,7 @@ import time
 import socket
 import re
 import json
+import copy
 
 import tatsu
 import paramiko
@@ -73,7 +74,12 @@ class ExpectRunner(ActionRunner):
     def __init__(self, runner_id, config=None):
         super(ExpectRunner, self).__init__(runner_id=runner_id)
 
-        self._config = config or {}
+        config = copy.deepcopy(config) or {}
+        self._config = {
+            'init_cmds': config.pop('init_cmds', []),
+            'default_expect': config.pop('default_expect', None)
+        }
+        self._config.update(config)
 
     def _parse(self, output):
         model = tatsu.compile(self._grammar)
