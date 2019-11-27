@@ -1,0 +1,30 @@
+codecov:
+  bot: ""
+  notify:
+    require_ci_to_pass: yes
+
+coverage:
+  precision: 2         # decimal places to display: 0 <= value <= 4
+  round: nearest
+  range: 50...90      # custom range of coverage colors from red -> yellow -> green
+
+  status:
+    project:
+      default:
+        default: false
+        # TODO: Define threshold once we actually have some tests
+        #target: auto
+        #threshold: 2%
+        #patch: yes
+
+# NOTE: We ignore all the auto-generated and test files
+ignore:
+  - ".*/tests/.*"
+  - ".*/generated/.*"
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: yes
+  require_head: yes
