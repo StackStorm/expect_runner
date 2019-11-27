@@ -110,12 +110,23 @@ compile:
 	@echo
 	. $(VIRTUALENV_DIR)/bin/activate; nosetests $(NOSE_OPTS) -s -v tests/unit/
 
-.PHONY: .unit-tests-py3
-.unit-tests-py3:
+.PHONY: .unit-tests-coverage
+.unit-tests-coverage:
 	@echo
-	@echo "==================== unit-tests-py3 ===================="
+	@echo "==================== unit-tests-coverage ===================="
 	@echo
-	NOSE_WITH_TIMER=$(NOSE_WITH_TIMER) tox -e py36-unit -vv
+	. $(VIRTUALENV_DIR)/bin/activate; nosetests --with-cover --cover-erase --cover-tests --cover-package=expect_runner,tests $(NOSE_OPTS) -s -v tests/unit/
+
+.PHONY: .unit-tests-coverage-ci
+.unit-tests-coverage-ci:
+	@echo
+	@echo "==================== unit-tests-coverage-ci ===================="
+	@echo
+	rm -f .coverage
+	rm -f coverage.xml
+	coverage xml --rcfile=./../lint-configs/.coveragerc -i -o coverage.xml
+	. $(VIRTUALENV_DIR)/bin/activate; nosetests --with-cover --cover-erase --cover-tests --cover-package=expect_runner,tests $(NOSE_OPTS) -s -v tests/unit/
+	virtualenv/bin/codecov --file coverage.xml
 
 .PHONY: .clone_st2_repo
 .clone_st2_repo: /tmp/st2
@@ -134,6 +145,7 @@ requirements: virtualenv .clone_st2_repo
 	. $(VIRTUALENV_DIR)/bin/activate && $(VIRTUALENV_DIR)/bin/pip install --cache-dir $(HOME)/.pip-cache $(PIP_OPTIONS) -r /tmp/st2/requirements.txt
 	. $(VIRTUALENV_DIR)/bin/activate && $(VIRTUALENV_DIR)/bin/pip install --cache-dir $(HOME)/.pip-cache $(PIP_OPTIONS) -r /tmp/st2/test-requirements.txt
 	. $(VIRTUALENV_DIR)/bin/activate && $(VIRTUALENV_DIR)/bin/pip install --cache-dir $(HOME)/.pip-cache $(PIP_OPTIONS) -r requirements.txt
+	. $(VIRTUALENV_DIR)/bin/activate && $(VIRTUALENV_DIR)/bin/pip install --cache-dir $(HOME)/.pip-cache $(PIP_OPTIONS) -r requirements-tests.txt
 
 .PHONY: requirements-ci
 requirements-ci:
@@ -143,6 +155,7 @@ requirements-ci:
 	. $(VIRTUALENV_DIR)/bin/activate && $(VIRTUALENV_DIR)/bin/pip install --cache-dir $(HOME)/.pip-cache $(PIP_OPTIONS) -r /tmp/st2/requirements.txt
 	. $(VIRTUALENV_DIR)/bin/activate && $(VIRTUALENV_DIR)/bin/pip install --cache-dir $(HOME)/.pip-cache $(PIP_OPTIONS) -r /tmp/st2/test-requirements.txt
 	. $(VIRTUALENV_DIR)/bin/activate && $(VIRTUALENV_DIR)/bin/pip install --cache-dir $(HOME)/.pip-cache $(PIP_OPTIONS) -r requirements.txt
+	. $(VIRTUALENV_DIR)/bin/activate && $(VIRTUALENV_DIR)/bin/pip install --cache-dir $(HOME)/.pip-cache $(PIP_OPTIONS) -r requirements-tests.txt
 
 .PHONY: virtualenv
 virtualenv: $(VIRTUALENV_DIR)/bin/activate
