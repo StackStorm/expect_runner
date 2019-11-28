@@ -39,7 +39,7 @@ ENTRY_TIME = None
 
 TIMEOUT = 60
 
-SLEEP_TIMER = 0.2
+SLEEP_TIMER = 0.1
 
 
 class TimeoutError(Exception):
