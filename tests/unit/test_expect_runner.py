@@ -290,6 +290,7 @@ class ExpectRunnerTestCase(RunnerTestCase):
         )
 
     def test_no_grammar_with_no_config(self):
+        MockParimiko.reset_mock()
         runner = expect_runner.get_runner(config=None)
         self.assertEqual(runner._config, {'init_cmds': [], 'default_expect': None})
         runner.action = self._get_mock_action_obj()
