@@ -39,7 +39,7 @@ ENTRY_TIME = None
 
 TIMEOUT = 60
 
-SLEEP_TIMER = 0.2
+SLEEP_TIMER = 0.1
 
 
 class TimeoutError(Exception):
@@ -233,6 +233,7 @@ class SSHHandler(ConnectionHandler):
 
     def terminate(self):
         self._shell.close()
+        self._ssh.close()
 
     def send(self, command, expect):
         self._shell.settimeout(_remaining_time())

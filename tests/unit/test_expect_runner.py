@@ -123,12 +123,12 @@ MOCK_JSON_ENTRIES = """{"entries": [{"name": ["George", "Clooney"],
 
 MOCK_BROKEN_GRAMMAR = "entry = {/.*/}"
 
-MockParimiko = mock.MagicMock()
-MockParimiko.SSHClient().invoke_shell().recv_ready.side_effect = \
-    lambda: (MockParimiko.SSHClient().invoke_shell().recv_ready.call_count % 2) == 0
-MockParimiko.SSHClient().invoke_shell().recv_stderr_ready.side_effect = \
+MockParamiko = mock.MagicMock()
+MockParamiko.SSHClient().invoke_shell().recv_ready.side_effect = \
+    lambda: (MockParamiko.SSHClient().invoke_shell().recv_ready.call_count % 2) == 0
+MockParamiko.SSHClient().invoke_shell().recv_stderr_ready.side_effect = \
     mock.Mock(return_value=False)
-MockParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_OUTPUT
+MockParamiko.SSHClient().invoke_shell().recv.return_value = MOCK_OUTPUT
 
 
 MOCK_CONFIG = {
@@ -143,7 +143,7 @@ def get_runner(config=None):
     return runner
 
 
-@mock.patch('expect_runner.expect_runner.paramiko', MockParimiko)
+@mock.patch('expect_runner.expect_runner.paramiko', MockParamiko)
 @mock.patch('expect_runner.expect_runner.SLEEP_TIMER', 0.05)  # Decrease sleep to speed up tests
 class ExpectRunnerTestCase(RunnerTestCase):
     maxDiff = None
@@ -248,13 +248,13 @@ class ExpectRunnerTestCase(RunnerTestCase):
         runner.pre_run()
         (status, output, _) = runner.run(None)
 
-        ssh_client = MockParimiko.SSHClient()
+        ssh_client = MockParamiko.SSHClient()
         shell = ssh_client.invoke_shell()
 
-        MockParimiko.SSHClient.assert_called()
+        MockParamiko.SSHClient.assert_called()
 
         ssh_client.set_missing_host_key_policy.assert_called_with(
-            MockParimiko.AutoAddPolicy()
+            MockParamiko.AutoAddPolicy()
         )
         ssh_client.connect.assert_called_with(
             RUNNER_PARAMETERS['host'],
@@ -290,6 +290,8 @@ class ExpectRunnerTestCase(RunnerTestCase):
         )
 
     def test_no_grammar_with_no_config(self):
+        MockParamiko.reset_mock()
+
         runner = expect_runner.get_runner(config=None)
         self.assertEqual(runner._config, {'init_cmds': [], 'default_expect': None})
         runner.action = self._get_mock_action_obj()
@@ -300,6 +302,10 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertEqual(status, LIVEACTION_STATUS_SUCCEEDED)
         self.assertTrue(output is not None)
         self.assertEqual(output['result'], '')
+
+        # Verify connection is closed at the end
+        self.assertEqual(runner._shell._ssh.close.call_count, 1)
+        self.assertEqual(runner._shell._shell.close.call_count, 1)
 
     def test_none_expect(self):
         runner = get_runner()
@@ -338,14 +344,14 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertEqual(output['error'], 'Expect and command cannot both be NoneType.')
 
     def test_unicode_response(self):
-        MockUnicodeParimiko = mock.MagicMock()
-        MockUnicodeParimiko.SSHClient().invoke_shell().recv_ready.side_effect = \
-            lambda: (MockParimiko.SSHClient().invoke_shell().recv_ready.call_count % 2) == 0
-        MockUnicodeParimiko.SSHClient().invoke_shell().recv_stderr_ready.side_effect = \
+        MockUnicodeParamiko = mock.MagicMock()
+        MockUnicodeParamiko.SSHClient().invoke_shell().recv_ready.side_effect = \
+            lambda: (MockParamiko.SSHClient().invoke_shell().recv_ready.call_count % 2) == 0
+        MockUnicodeParamiko.SSHClient().invoke_shell().recv_stderr_ready.side_effect = \
             mock.Mock(return_value=False)
-        MockUnicodeParimiko.SSHClient().invoke_shell().recv.return_value = MOCK_UNICODE_OUTPUT
+        MockUnicodeParamiko.SSHClient().invoke_shell().recv.return_value = MOCK_UNICODE_OUTPUT
 
-        with mock.patch('expect_runner.expect_runner.paramiko', MockUnicodeParimiko):
+        with mock.patch('expect_runner.expect_runner.paramiko', MockUnicodeParamiko):
             runner = get_runner()
             runner.action = self._get_mock_action_obj()
             runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
@@ -356,10 +362,10 @@ class ExpectRunnerTestCase(RunnerTestCase):
             self.assertTrue(output is not None)
             self.assertEqual(output['result'], MOCK_UNICODE_OUTPUT)
 
-        MockUnicodeParimiko.SSHClient().invoke_shell().recv.return_value = \
+        MockUnicodeParamiko.SSHClient().invoke_shell().recv.return_value = \
             MOCK_UNICODE_OUTPUT_WITH_FAKE_BYTE
 
-        with mock.patch('expect_runner.expect_runner.paramiko', MockUnicodeParimiko):
+        with mock.patch('expect_runner.expect_runner.paramiko', MockUnicodeParamiko):
             runner = get_runner()
             runner.action = self._get_mock_action_obj()
             runner.runner_parameters = copy.deepcopy(RUNNER_PARAMETERS)
