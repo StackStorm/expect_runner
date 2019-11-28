@@ -233,6 +233,7 @@ class SSHHandler(ConnectionHandler):
 
     def terminate(self):
         self._shell.close()
+        self._ssh.close()
 
     def send(self, command, expect):
         self._shell.settimeout(_remaining_time())
