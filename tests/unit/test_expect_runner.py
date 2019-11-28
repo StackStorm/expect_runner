@@ -301,6 +301,10 @@ class ExpectRunnerTestCase(RunnerTestCase):
         self.assertTrue(output is not None)
         self.assertEqual(output['result'], '')
 
+        # Verify connection is closed at the end
+        self.assertEqual(runner._shell._ssh.close.call_count, 1)
+        self.assertEqual(runner._shell._shell.close.call_count, 1)
+
     def test_none_expect(self):
         runner = get_runner()
         runner.action = self._get_mock_action_obj()
